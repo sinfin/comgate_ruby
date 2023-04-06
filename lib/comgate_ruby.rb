@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require_relative "comgate_ruby/version"
+require_relative "base_service"
+require_relative "comgate/version"
+require_relative "comgate/api_caller"
+require_relative "comgate/gateway"
 
-module ComgateRuby
-  class Error < StandardError; end
-  # Your code goes here...
-end
