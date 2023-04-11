@@ -13,3 +13,14 @@ Style/StringLiteralsInInterpolation:
 Layout/LineLength:
   Max: 120
 
+Style/Documentation:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/AbcSize:
+  Max: 25

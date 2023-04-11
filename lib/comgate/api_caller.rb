@@ -110,11 +110,15 @@ module Comgate
     def parsed_response_body
       resp = symbolize_keys(URI.decode_www_form(response.body).to_h)
       resp[:code] = resp[:code].to_i if resp[:code]
+      if resp[:error]
+        resp[:error] = resp[:error].to_i
+        resp[:code] = resp[:error]
+      end
       resp
     end
 
     def api_log(level, message)
-      if defined?(Rails)
+      if defined?(Rails) && Rails.respond_to?(:logger)
         Rails.logger.send(forced_log_level(level), message)
       else
         puts("#{Time.now} [#{forced_log_level(level)}] #{message}")
