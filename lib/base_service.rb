@@ -6,7 +6,7 @@ class BaseService
   def self.call(*args, **keyword_args)
     if args.empty?
       new(**keyword_args).call
-    elsif keyword_args.blank?
+    elsif keyword_args.empty?
       new(*args).call
     else
       new(*args, **keyword_args).call

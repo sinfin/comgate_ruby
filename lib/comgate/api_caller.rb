@@ -19,11 +19,16 @@ module Comgate
 
     attr_reader :payload, :url
 
-    ResultHash = Struct.new(:code, :response_hash, keyword_init: true)
+    ResultHash = Struct.new(:code, :response_hash, keyword_init: true) do
+      def redirect?
+        (code / 100) == 3
+      end
 
-    def build_result
-      call_api
-      process_response
+      def redirect_to
+        return nil unless redirect?
+
+        response_hash.dig(:headers, :redirect_to)
+      end
     end
 
     def initialize(url:, payload:, test_call: false)
@@ -31,6 +36,15 @@ module Comgate
       @url = url
       @payload = payload
       @payload.merge!(test: "true") if test_call
+    end
+
+    def build_result
+      call_api
+      process_response
+    end
+
+    def redirect?
+      response&.code&.to_i == 302
     end
 
     private
@@ -48,7 +62,7 @@ module Comgate
 
       api_log(:debug, "Comgate API RESPONSE: #{response} with body:\n#{response.body}")
 
-      @result = ResultHash.new(code: response.code.to_i, response_hash: parsed_response_body)
+      @result = ResultHash.new(code: response.code.to_i, response_hash: parsed_response)
       return unless api_error?
 
       errors[:api] = [api_error_text]
@@ -74,7 +88,7 @@ module Comgate
     end
 
     def headers
-      {}
+      { "Content-Type" => "application/x-www-form-urlencoded" }
     end
 
     def connection_options
@@ -91,6 +105,8 @@ module Comgate
     end
 
     def api_error?
+      return false if redirect?
+
       result.response_hash[:code].positive?
     end
 
@@ -107,8 +123,20 @@ module Comgate
       URI.encode_www_form(payload)
     end
 
+    def parsed_response
+      parsed_response_body.merge({ headers: parsed_response_headers })
+    end
+
+    def parsed_response_headers
+      headers = {}
+      headers[:redirect_to] = response_location if redirect?
+      headers
+    end
+
     def parsed_response_body
-      resp = symbolize_keys(URI.decode_www_form(response.body).to_h)
+      return {} if response.body == "" || redirect?
+
+      resp = URI.decode_www_form(response.body).to_h.symbolize_keys
       resp[:code] = resp[:code].to_i if resp[:code]
       if resp[:error]
         resp[:error] = resp[:error].to_i
@@ -131,12 +159,15 @@ module Comgate
       levels[original_level] > levels[minimal_level] ? original_level : minimal_level
     end
 
-    def symbolize_keys(hash)
-      res = {}
-      hash.each_pair do |k, v|
-        res[k.to_sym] = v
-      end
-      res
+    def response_location
+      return nil unless redirect?
+
+      path_or_url = response["location"]
+      return nil if path_or_url == ""
+
+      response_uri = URI.parse(path_or_url)
+      response_uri = URI.join(url, response_uri) if response_uri.relative?
+      response_uri.to_s
     end
   end
 end

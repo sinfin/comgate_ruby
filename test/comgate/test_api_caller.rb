@@ -1,16 +1,22 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "net/http"
 
 module Comgate
   class TestApiCaller < Minitest::Test
     FAKE_URL = "http://test.me"
-    HttpResponseStubStruct = Struct.new(:code, :body, :uri, keyword_init: true)
+    HttpResponseStubStruct = Struct.new(:code, :body, :uri, :headers, keyword_init: true) do
+      def [](key)
+        headers[key]
+      end
+    end
 
     def test_gateway_respects_test_setting
       api_response = HttpResponseStubStruct.new(code: "200",
                                                 body: "code=0&message=OK+%28may+be?%29",
-                                                uri: URI.parse(FAKE_URL))
+                                                uri: URI.parse(FAKE_URL),
+                                                headers: {})
       payload = { my_payload: "here" }
       url = "#{FAKE_URL}/create"
 
@@ -55,6 +61,7 @@ module Comgate
 
       expected_response_hash = { code: 1400,
                                  error: 1400,
+                                 headers: {},
                                  message: err_message }
 
       expect(service).to be_failure, "Service should fail for non 0 code"
@@ -62,6 +69,31 @@ module Comgate
       expect(service.result.response_hash).to eql(expected_response_hash),
                                               "result.response should be '#{expected_response_hash}'"
       expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")
+    end
+
+    def test_redirection_if_response_is_redirect
+      redirect_path = "/redirect/here/please"
+
+      payload = { my_payload: "here" }
+      url = "#{FAKE_URL}/create"
+      expected_redirect_to_url = "#{FAKE_URL}#{redirect_path}"
+
+      api_response = HttpResponseStubStruct.new(code: 302,
+                                                body: "Found",
+                                                uri: "",
+                                                headers: { "location" => redirect_path })
+
+      matching_request = { method: "POST",
+                           path: "/create",
+                           body: URI.encode_www_form(payload.merge({ test: "true" })) }
+
+      srv = Net::HTTP.stub(:start, fake_http(api_response, matching_request)) do
+        Comgate::ApiCaller.call(url: url, payload: payload, test_call: true)
+      end
+      assert srv.redirect?
+      assert srv.result.redirect?
+      assert_equal({ headers: { redirect_to: expected_redirect_to_url } }, srv.result.response_hash)
+      assert_equal expected_redirect_to_url, srv.result.redirect_to
     end
 
     private
@@ -98,7 +130,8 @@ module Comgate
       response_body = URI.encode_www_form(response_hash)
       api_error_response = HttpResponseStubStruct.new(code: "200",
                                                       body: response_body,
-                                                      uri: URI.parse("https://comgate.cz"))
+                                                      uri: URI.parse("https://comgate.cz"),
+                                                      headers: {})
 
       Net::HTTP.stub(:start, fake_http(api_error_response)) do
         Comgate::ApiCaller.call(url: request_hash[:url], payload: request_hash[:payload], test_call: true)
