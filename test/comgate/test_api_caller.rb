@@ -71,7 +71,7 @@ module Comgate
       expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")
     end
 
-    def test_redirection_if_response_is_redirect
+    def test_redirect_if_response_is_302 # rubocop:disable Naming/VariableNumber
       redirect_path = "/redirect/here/please"
 
       payload = { my_payload: "here" }
@@ -90,9 +90,37 @@ module Comgate
       srv = Net::HTTP.stub(:start, fake_http(api_response, matching_request)) do
         Comgate::ApiCaller.call(url: url, payload: payload, test_call: true)
       end
-      assert srv.redirect?
+
       assert srv.result.redirect?
-      assert_equal({ headers: { redirect_to: expected_redirect_to_url } }, srv.result.response_hash)
+      assert_equal({ Found: "", headers: {} }, srv.result.response_hash)
+      assert_equal expected_redirect_to_url, srv.result.redirect_to
+    end
+
+    def test_redirect_if_response_is_200_and_params_inludes_redirect
+      payload = { my_payload: "here" }
+      url = "#{FAKE_URL}/create"
+      expected_redirect_to_url = "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56"
+
+      api_response = HttpResponseStubStruct.new(code: "200",
+                                                body: "code=0&message=OK&transId=AB12-CD34-EF56&redirect=https%3A%2F%2Fpayments.comgate.cz%2Fclient%2Finstructions%2Findex%3Fid%3DAB12-CD34-EF56", # rubocop:disable Layout/LineLength
+                                                uri: URI.parse(FAKE_URL),
+                                                headers: {})
+
+      matching_request = { method: "POST",
+                           path: "/create",
+                           body: URI.encode_www_form(payload.merge({ test: "true" })) }
+
+      srv = Net::HTTP.stub(:start, fake_http(api_response, matching_request)) do
+        Comgate::ApiCaller.call(url: url, payload: payload, test_call: true)
+      end
+
+      expected_response_hash = { code: 0,
+                                 message: "OK",
+                                 transId: "AB12-CD34-EF56",
+                                 redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56",
+                                 headers: {} }
+      assert srv.result.redirect?
+      assert_equal expected_response_hash, srv.result.response_hash
       assert_equal expected_redirect_to_url, srv.result.redirect_to
     end
 

@@ -18,102 +18,94 @@ module Comgate
       # The payment gateway server responds only if the payment is created in a background (prepareOnly=true).
       payment_params = minimal_payment_params
 
-      expected_url = "https://payments.comgate.cz/v1.0/create"
-      expected_payload = {
-        curr: payment_params[:payment][:currency],
-        email: payment_params[:payer][:email],
-        label: payment_params[:payment][:label],
-        merchant: gateway_options[:merchant_gateway_id],
-        method: payment_params[:payment][:method],
-        prepareOnly: true,
-        price: payment_params[:payment][:price_in_cents],
-        refId: payment_params[:payment][:reference_id],
-        secret: gateway_options[:secret]
-      }
-      response_hash = { code: 0,
-                        message: "OK",
-                        transId: "AB12-CD34-EF56",
-                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }
-      result = Comgate::ApiCaller::ResultHash.new(code: 200,
-                                                  response_hash: response_hash)
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        transId: "AB12-CD34-EF56",
+                                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
+                       test_call: true }
 
-      result = expect_method_called_on(object: Comgate::ApiCaller,
-                                       method: :call,
-                                       args: [],
-                                       kwargs: { url: expected_url, payload: expected_payload, test_call: true },
-                                       return_value: successful_service_stub(result)) do
+      result = expect_api_call_with(expectations) do
         gateway.start_transaction(payment_params)
       end
 
-      assert !result.redirect?
-      assert_equal 200, result.code
-      assert_equal(response_hash, result.response_hash)
+      assert result.redirect?
+      assert_equal expectations[:response_hash][:redirect], result.redirect_to
     end
 
     def test_create_single_payment_with_maximal_data # rubocop:disable Metrics/AbcSize
       # The payment gateway server responds only if the payment is created in a background (prepareOnly=true).
       payment_params = maximal_payment_params.merge(test: false)
 
-      expected_url = "https://payments.comgate.cz/v1.0/create"
-      expected_payload = {
-        curr: payment_params[:payment][:currency],
-        email: payment_params[:payer][:email],
-        label: payment_params[:payment][:label],
-        merchant: gateway_options[:merchant_gateway_id],
-        method: payment_params[:payment][:method],
-        prepareOnly: true,
-        price: payment_params[:payment][:price_in_cents],
-        refId: payment_params[:payment][:reference_id],
-        secret: gateway_options[:secret],
-        account: payment_params[:merchant][:target_shop_account],
-        applePayPayload: Base64.encode64(payment_params[:payment][:apple_pay_payload]),
-        country: payment_params[:options][:country_code],
-        dynamicExpiration: payment_params[:payment][:dynamic_expiration],
-        expirationTime: payment_params[:payment][:expiration_time],
-        name: payment_params[:payment][:product_name],
-        lang: payment_params[:options][:language_code],
-        phone: payment_params[:payer][:phone]
-      }
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret],
+                                       account: payment_params[:merchant][:target_shop_account],
+                                       applePayPayload: Base64.encode64(payment_params[:payment][:apple_pay_payload]),
+                                       country: payment_params[:options][:country_code],
+                                       dynamicExpiration: payment_params[:payment][:dynamic_expiration],
+                                       expirationTime: payment_params[:payment][:expiration_time],
+                                       name: payment_params[:payment][:product_name],
+                                       lang: payment_params[:options][:language_code],
+                                       phone: payment_params[:payer][:phone] },
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        transId: "AB12-CD34-EF56",
+                                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
+                       test_call: false }
 
-      response_hash = { code: 0,
-                        message: "OK",
-                        transId: "AB12-CD34-EF56",
-                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }
-      result = Comgate::ApiCaller::ResultHash.new(code: 200,
-                                                  response_hash: response_hash)
-
-      result = expect_method_called_on(object: Comgate::ApiCaller,
-                                       method: :call,
-                                       args: [],
-                                       kwargs: { url: expected_url, payload: expected_payload, test_call: false },
-                                       return_value: successful_service_stub(result)) do
+      result = expect_api_call_with(expectations) do
         gateway.start_transaction(payment_params)
       end
 
-      assert !result.redirect?
-      assert_equal 200, result.code
-      assert_equal(response_hash, result.response_hash)
+      assert result.redirect?
+      assert_equal expectations[:response_hash][:redirect], result.redirect_to
     end
 
-    def test_create_reccuring_payment; end
+    def test_process_comgate_state_change_request
+      skip
+    end
 
-    def test_create_verification_payment; end
+    def test_create_reccuring_payments
+      skip
+      # gateway.start_reccuring_transaction(payment_data)
 
-    def test_create_preauthorizated_payment; end
+      # gateway.repeat_transaction(transaction_id: ":transID", payment_data: payment_data }})
+    end
 
-    def test_cancel_preauthorizated_payment; end
+    def test_create_verification_payment = skip
+
+    def test_create_preauthorizated_payment = skip
+    def test_confirm_preauthorizated_payment = skip
+    def test_cancel_preauthorizated_payment = skip
 
     def test_refund_payment
       # partial or whole
     end
 
-    def test_cancel_payment; end
+    def test_cancel_payment = skip
 
-    def test_get_payment_status; end
+    def test_get_payment_state = skip
 
-    def test_get_available_payment_methods; end
+    def test_get_available_payment_methods = skip
 
-    def test_get_transfers_list; end
+    def test_get_transfers_list = skip
 
     private
 
@@ -191,6 +183,24 @@ module Comgate
                                                     },
                                                     test: true
                                                   })
+    end
+
+    def expect_api_call_with(expectations, &block)
+      api_result = Comgate::ApiCaller::ResultHash.new(code: 200,
+                                                      redirect_to: expectations[:response_hash][:redirect],
+                                                      response_hash: expectations[:response_hash])
+
+      result = expect_method_called_on(object: Comgate::ApiCaller,
+                                       method: :call,
+                                       args: [],
+                                       kwargs: { url: expectations[:call_url],
+                                                 payload: expectations[:call_payload],
+                                                 test_call: expectations[:test_call] },
+                                       return_value: successful_service_stub(api_result), &block)
+
+      assert_equal 200, result.code
+      assert_equal(expectations[:response_hash], result.response_hash)
+      result
     end
 
     ServiceStubStruct = Struct.new(:success?, :errors, :result, keyword_init: true)

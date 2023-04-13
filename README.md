@@ -40,7 +40,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Reccuring payments
 1) Use `gateway.start_reccuring_transaction(payment_data)` and store `transaction_id`.
-2) Create following payments `gateway.repeat_transaction(transaction_id: ":transID", payment_data: payment_data }})`. No redirection here. Price can change in ech payment.
+2) Create following payments `gateway.repeat_transaction(transaction_id: ":transID", payment_data: payment_data }})`. No redirection here. Price can change in each payment.
 3) Handle status change like bullets 4) and 5) in single payment
 
 ### Preauthorized payments

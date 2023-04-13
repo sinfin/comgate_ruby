@@ -17,17 +17,11 @@ module Comgate
       Net::ProtocolError
     ].freeze
 
-    attr_reader :payload, :url
+    attr_reader :payload, :url, :redirect_to
 
-    ResultHash = Struct.new(:code, :response_hash, keyword_init: true) do
+    ResultHash = Struct.new(:code, :redirect_to, :response_hash, keyword_init: true) do
       def redirect?
-        (code / 100) == 3
-      end
-
-      def redirect_to
-        return nil unless redirect?
-
-        response_hash.dig(:headers, :redirect_to)
+        !redirect_to.nil?
       end
     end
 
@@ -36,15 +30,12 @@ module Comgate
       @url = url
       @payload = payload
       @payload.merge!(test: "true") if test_call
+      @redirect_to = nil
     end
 
     def build_result
       call_api
       process_response
-    end
-
-    def redirect?
-      response&.code&.to_i == 302
     end
 
     private
@@ -62,7 +53,11 @@ module Comgate
 
       api_log(:debug, "Comgate API RESPONSE: #{response} with body:\n#{response.body}")
 
-      @result = ResultHash.new(code: response.code.to_i, response_hash: parsed_response)
+      set_redirection
+      @result = ResultHash.new(code: response.code.to_i,
+                               redirect_to: redirect_to,
+                               response_hash: parsed_response)
+
       return unless api_error?
 
       errors[:api] = [api_error_text]
@@ -104,8 +99,26 @@ module Comgate
       }
     end
 
+    def set_redirection
+      rcode = response&.code&.to_i
+      @redirect_to = nil
+
+      return unless rcode.positive?
+
+      case rcode
+      when 302
+        @redirect_to = response_location
+      when 200
+        @redirect_to = parsed_response_body[:redirect]
+      end
+    end
+
+    def response_redirect?
+      !redirect_to.nil?
+    end
+
     def api_error?
-      return false if redirect?
+      return false if response_redirect?
 
       result.response_hash[:code].positive?
     end
@@ -128,13 +141,11 @@ module Comgate
     end
 
     def parsed_response_headers
-      headers = {}
-      headers[:redirect_to] = response_location if redirect?
-      headers
+      {}
     end
 
     def parsed_response_body
-      return {} if response.body == "" || redirect?
+      return {} if response.body == ""
 
       resp = URI.decode_www_form(response.body).to_h.symbolize_keys
       resp[:code] = resp[:code].to_i if resp[:code]
@@ -160,8 +171,6 @@ module Comgate
     end
 
     def response_location
-      return nil unless redirect?
-
       path_or_url = response["location"]
       return nil if path_or_url == ""
 
