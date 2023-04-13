@@ -15,19 +15,76 @@ If bundler is not being used to manage dependencies, install the gem by executin
     $ gem install comgate_ruby
 
 ## Usage
-1) set gateway object
+### 1) set gateway object
+### 2) prepare endpoint
+ Comgate sends POST requests to your app about transactions updates. The URL of it needs to be setup in Comgate Client portal. At endpoint, just call `gateway.process_state_change(params)`, which will return
+    `{state: :paid, transaction_id: ":transID"}` (at least). See bullets 4) and 5) in Single payment process bellow.
+### 3) call appropriate method
+ (see bellow)
 
-```ruby
-gateway = Commgate::Gateway.new(...)
-```
-2) call propriate action
-```ruby
-  gateway.create_payment(payment_data)
-  gateway.check_status_of_payment(payment_data)
-  gateway.cancel_payment(payment_data)
-  gateway.refund_payment(payment_data)
-```
+## Usecases
+### Single payment process
+1) Start transaction by `gateway.start_transaction(payment_data)`. Response contains `transaction_id` and `redirect_to`.
+2) Redirect user to `redirect_to` page (Comgate form).
+3) Client will (not) pay.
+4) Comgate will send request to your defined endpoint about status change of transaction. Call `gateway.process_state_change(payload)`, which will return
+  `{state: :paid, transaction_id: ":transID"}`(and maybe some more informations).
+5) Now is Your time to handle payment (or other state like `cancelled`, `authorized`).
 
+### Reccuring payments
+1) Use `gateway.start_reccuring_transaction(payment_data)` and store `transaction_id`.
+2) Create following payments `gateway.repeat_transaction(transaction_id: ":transID", payment_data: payment_data }})`. No redirection here. Price can change in ech payment.
+3) Handle status change like bullets 4) and 5) in single payment
+
+### Preauthorized payments
+1) Use `gateway.start_preauthorized_transaction(payment_data)` and store `transaction_id`.
+2a) Confirm payment by `gateway.authorize_transaction(transaction_id: ":transID", payment_data)` (price cannot exceed preauthorized amount)
+2b) Cancel payment by `gateway.cancel_preauthorized_transaction(transaction_id: ":transID")`
+3) Handle status change like bullets 4) and 5) in single payment
+
+### Verification payments
+1) Use `gateway.start_verfication_transaction(payment_data)` and store `transaction_id`.
+2) If payment is succesfull, bank will refund payment immediatelly.
+3) Then you can create (repeat) payments like reccuring payments.
+
+### Refund payment
+1) Call `gateway.refund_transaction(transaction_id: ":transID", payment_data)` (refunded value cannot exceed paid amount)
+2) Handle status change like bullets 4) and 5) in single payment
+
+### Cancel payment
+1) Call `gateway.cancel_transaction(transaction_id: ":transID")`
+2) Handle status change like bullets 4) and 5) in single payment
+
+### Check payment state (ad-hoc)
+0) The endpoint must be always implemented, this is just additional way to check payment state
+1) Call `gateway.check_state(transaction_id: ":transID")`. It will return `{state: :paid, transaction_id: ":transID"}` and some more infos.
+2) Handle status change like bullet 5) in single payment
+
+### Get payment methods allowed to merchant
+1) Call `gateway.allowed_payment_methods`. It will return array of allowed payment methods.
+   ```
+    [
+      { id: "BANK_CZ_CS_P",
+        name: "Česká spořitelna - PLATBA 24",
+        description: "On-line platba pro majitele účtu u České spořitelny.",
+        logo_url: "https://payments.comgate.cz/assets/images/logos/BANK_CZ_CS_P.png" },
+      { id: "BANK_CZ_FB_P",
+        name: "Fio banka - PayMyway",
+        description: "On-line platba pro majitele účtu u Fio banky.",
+        logo_url: "https://payments.comgate.cz/assets/images/logos/BANK_CZ_FB.png" }
+    ]
+   ```
+
+### Get list of transfers for date
+1) Call `gateway.transfers_from(date)`. Array of transfers will be returned.
+    ```
+    [
+      { transfer_id: 1234567,
+        transfer_date: date,
+        account_counter_party: "0/0000",
+        account_outgoing: "123456789/0000",
+        variable_symbol: "12345678"}
+    ]
 
 ## Development
 
