@@ -6,11 +6,11 @@ unless {}.respond_to?(:deep_merge)
       result = dup
       other_hash.each do |key, value|
         existing_value = result[key]
-        if existing_value.is_a?(Hash)
-          existing_value.deep_merge(value)
-        else
-          result[key] = value
-        end
+        result[key] = if existing_value.is_a?(Hash)
+                        existing_value.deep_merge(value)
+                      else
+                        value
+                      end
       end
       result
     end

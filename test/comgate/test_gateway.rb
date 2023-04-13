@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "base64"
 
 module Comgate
   class TestGateway < Minitest::Test
@@ -13,48 +14,9 @@ module Comgate
       assert gateway.test_calls_used?
     end
 
-    def test_create_single_payment_on_frontend # rubocop:disable Metrics/AbcSize
-      # If the payment is created through redirection (aka Frontend; the prepareOnly parameter is “false”),
-      # then the payment gateway server directly redirects the Payer to the appropriate URL
-      # or displays an error message.
-      payment_params = minimal_payment_params
-      expected_url = "https://payments.comgate.cz/v1.0/create"
-      expected_payload = {
-        curr: payment_params[:payment][:currency],
-        email: payment_params[:payer][:email],
-        label: payment_params[:payment][:label],
-        merchant: gateway_options[:merchant_gateway_id],
-        method: payment_params[:payment][:method],
-        prepareOnly: false,
-        price: payment_params[:payment][:price_in_cents],
-        refId: payment_params[:payment][:reference_id],
-        secret: nil
-      }
-      result = Comgate::ApiCaller::ResultHash.new(code: 302,
-                                                  response_hash: {
-                                                    headers: {
-                                                      redirect_to: "https://payments.comgate.cz/relative/path"
-                                                    }
-                                                  })
-
-      result = expect_method_called_on(object: Comgate::ApiCaller,
-                                       method: :call,
-                                       args: [],
-                                       kwargs: { url: expected_url, payload: expected_payload, test_call: true },
-                                       return_value: successful_service_stub(result)) do
-        gateway.create_payment(payment_params)
-      end
-
-      assert_equal 302, result.code
-      assert result.redirect?
-      assert_equal "https://payments.comgate.cz/relative/path", result.redirect_to
-    end
-
-    # reccuring payments
-    def test_create_single_payment_on_backend # rubocop:disable Metrics/AbcSize
+    def test_create_single_payment_with_minimal_data # rubocop:disable Metrics/AbcSize
       # The payment gateway server responds only if the payment is created in a background (prepareOnly=true).
       payment_params = minimal_payment_params
-      payment_params[:payment][:at_background] = true
 
       expected_url = "https://payments.comgate.cz/v1.0/create"
       expected_payload = {
@@ -66,7 +28,7 @@ module Comgate
         prepareOnly: true,
         price: payment_params[:payment][:price_in_cents],
         refId: payment_params[:payment][:reference_id],
-        secret: nil
+        secret: gateway_options[:secret]
       }
       response_hash = { code: 0,
                         message: "OK",
@@ -80,7 +42,52 @@ module Comgate
                                        args: [],
                                        kwargs: { url: expected_url, payload: expected_payload, test_call: true },
                                        return_value: successful_service_stub(result)) do
-        gateway.create_payment(payment_params)
+        gateway.start_transaction(payment_params)
+      end
+
+      assert !result.redirect?
+      assert_equal 200, result.code
+      assert_equal(response_hash, result.response_hash)
+    end
+
+    def test_create_single_payment_with_maximal_data # rubocop:disable Metrics/AbcSize
+      # The payment gateway server responds only if the payment is created in a background (prepareOnly=true).
+      payment_params = maximal_payment_params.merge(test: false)
+
+      expected_url = "https://payments.comgate.cz/v1.0/create"
+      expected_payload = {
+        curr: payment_params[:payment][:currency],
+        email: payment_params[:payer][:email],
+        label: payment_params[:payment][:label],
+        merchant: gateway_options[:merchant_gateway_id],
+        method: payment_params[:payment][:method],
+        prepareOnly: true,
+        price: payment_params[:payment][:price_in_cents],
+        refId: payment_params[:payment][:reference_id],
+        secret: gateway_options[:secret],
+        account: payment_params[:merchant][:target_shop_account],
+        applePayPayload: Base64.encode64(payment_params[:payment][:apple_pay_payload]),
+        country: payment_params[:options][:country_code],
+        dynamicExpiration: payment_params[:payment][:dynamic_expiration],
+        expirationTime: payment_params[:payment][:expiration_time],
+        name: payment_params[:payment][:product_name],
+        lang: payment_params[:options][:language_code],
+        phone: payment_params[:payer][:phone]
+      }
+
+      response_hash = { code: 0,
+                        message: "OK",
+                        transId: "AB12-CD34-EF56",
+                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }
+      result = Comgate::ApiCaller::ResultHash.new(code: 200,
+                                                  response_hash: response_hash)
+
+      result = expect_method_called_on(object: Comgate::ApiCaller,
+                                       method: :call,
+                                       args: [],
+                                       kwargs: { url: expected_url, payload: expected_payload, test_call: false },
+                                       return_value: successful_service_stub(result)) do
+        gateway.start_transaction(payment_params)
       end
 
       assert !result.redirect?
@@ -117,7 +124,8 @@ module Comgate
     def gateway_options
       {
         merchant_gateway_id: "some_id_from_comgate",
-        test_calls: true
+        test_calls: true,
+        secret: "Psst!ItIsPrivate!"
       }
     end
 
@@ -129,8 +137,7 @@ module Comgate
                    price_in_cents: 100, # 1 CZK
                    label: "#2023-0123",
                    reference_id: "#2023-0123",
-                   method: "ALL",
-                   at_background: false }
+                   method: "ALL" }
       }
     end
 
@@ -142,8 +149,6 @@ module Comgate
                    price_in_cents: 100, # 1 CZK
                    label: "#2023-0123-4",
                    reference_id: "#2023-0123",
-                   at_background: true, # always true!
-                   background_secret: "hgfmkcslů",
                    init_payment_id: "dadasdaewvcxb" }
       }
     end
@@ -152,16 +157,16 @@ module Comgate
       minimal_payment_params.deep_merge({
                                           payer: { phone: "+420777888999" },
                                           merchant: { target_shop_account: "12345678/1234" }, # gateway variable
-                                          payment: { apple_pay_payload: "x",
-                                                     dynamic_expiration: true,
+                                          payment: { apple_pay_payload: "apple pay payload",
+                                                     dynamic_expiration: false,
                                                      expiration_time: "10h",
-                                                     init_reccuring_payments: true,
-                                                     product_name: "Usefull things",
-                                                     preauthorization: false,
-                                                     verification_payment: true },
+                                                     # init_reccuring_payments: true,
+                                                     product_name: "Usefull things" },
+                                          # preauthorization: false,
+                                          # verification_payment: true,
                                           options: {
                                             country_code: "DE",
-                                            embedded_iframe: false, # redirection after payment  # gateway variable
+                                            # embedded_iframe: false, # redirection after payment  # gateway variable
                                             language_code: "sk"
                                           },
                                           test: true

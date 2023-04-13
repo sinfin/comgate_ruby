@@ -16,6 +16,13 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ## Usage
 ### 1) set gateway object
+  As singleton on app init or for each transaction:
+  ```ruby
+    gateway = Commgate::Gateway.new(merchant_gateway_id: ":comgate_id",
+                                    test_calls: false,
+                                    secret: ":comgate_secret")
+  ```
+
 ### 2) prepare endpoint
  Comgate sends POST requests to your app about transactions updates. The URL of it needs to be setup in Comgate Client portal. At endpoint, just call `gateway.process_state_change(params)`, which will return
     `{state: :paid, transaction_id: ":transID"}` (at least). See bullets 4) and 5) in Single payment process bellow.
@@ -62,7 +69,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Get payment methods allowed to merchant
 1) Call `gateway.allowed_payment_methods`. It will return array of allowed payment methods.
-   ```
+   ```ruby
     [
       { id: "BANK_CZ_CS_P",
         name: "Česká spořitelna - PLATBA 24",
@@ -77,7 +84,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Get list of transfers for date
 1) Call `gateway.transfers_from(date)`. Array of transfers will be returned.
-    ```
+    ```ruby
     [
       { transfer_id: 1234567,
         transfer_date: date,

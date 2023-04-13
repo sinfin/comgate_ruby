@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+
 module Comgate
   class Gateway
     BASE_URL = "https://payments.comgate.cz/v1.0"
@@ -34,10 +36,12 @@ module Comgate
       options[:test_calls] == true
     end
 
-    def create_payment(payment_data)
+    def start_transaction(payment_data)
+      @payment_data = payment_data
+
       srv = Comgate::ApiCaller.call(url: "#{BASE_URL}/create",
-                                    payload: single_payment_payload_for(payment_data),
-                                    test_call: test_call_for?(payment_data))
+                                    payload: single_payment_payload,
+                                    test_call: test_call?)
       if srv.success?
         @result = srv.result
       else
@@ -47,22 +51,25 @@ module Comgate
 
     private
 
-    def test_call_for?(payment_data)
-      test_calls_used? || payment_data[:test]
+    attr_reader :payment_data
+
+    def test_call?
+      payment_data[:test].nil? ? test_calls_used? : (payment_data[:test] == true)
     end
 
-    def single_payment_payload_for(payment_data)
+    def single_payment_payload
       required_keys = %i[curr email label method price refId]
       optional_keys = %i[account applePayPayload country dynamicExpiration embedded expirationTime lang name phone
                          preauth verification]
 
       ph = {
         merchant: options[:merchant_gateway_id],
-        prepareOnly: (payment_data.dig(:payment, :at_background) || false),
-        secret: nil
+        prepareOnly: true,
+        secret: options[:secret]
       }
       ph.merge!(convert_data_to_comgate_params(required_keys, payment_data, required: true))
       ph.merge!(convert_data_to_comgate_params(optional_keys, payment_data, required: false))
+      ph[:applePayPayload] = Base64.encode64(ph[:applePayPayload]) unless ph[:applePayPayload].nil?
       ph
     end
 
