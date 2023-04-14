@@ -17,12 +17,19 @@ unless {}.respond_to?(:deep_merge)
   end
 end
 
-unless {}.respond_to?(:symbolize_keys)
+unless {}.respond_to?(:deep_symbolize_keys)
   class Hash
-    def symbolize_keys
+    def deep_symbolize_keys
       result = {}
       each_pair do |k, v|
-        result[k.to_sym] = v.is_a?(Hash) ? v.symbolize_keys : v
+        result[k.to_sym] = case v
+                           when Hash
+                             v.deep_symbolize_keys
+                           when Array
+                             v.collect { |item| item.is_a?(Hash) ? item.deep_symbolize_keys : item }
+                           else
+                             v
+                           end
       end
       result
     end

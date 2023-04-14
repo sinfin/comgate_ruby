@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "base64"
+require "json"
 
 module Comgate
   class TestGateway < Minitest::Test
@@ -30,7 +31,7 @@ module Comgate
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 0,
                                         message: "OK",
-                                        transId: "AB12-CD34-EF56",
+                                        transaction_id: "AB12-CD34-EF56",
                                         redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
                        test_call: true }
 
@@ -39,7 +40,9 @@ module Comgate
       end
 
       assert result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
       assert_equal expectations[:response_hash][:redirect], result.redirect_to
+      assert !result.response_hash[:transaction_id].nil?
     end
 
     def test_create_single_payment_with_maximal_data # rubocop:disable Metrics/AbcSize
@@ -66,7 +69,7 @@ module Comgate
                                        phone: payment_params[:payer][:phone] },
                        response_hash: { code: 0,
                                         message: "OK",
-                                        transId: "AB12-CD34-EF56",
+                                        transaction_id: "AB12-CD34-EF56",
                                         redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
                        test_call: false }
 
@@ -75,18 +78,78 @@ module Comgate
       end
 
       assert result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
       assert_equal expectations[:response_hash][:redirect], result.redirect_to
+      assert !result.response_hash[:transaction_id].nil?
     end
 
     def test_process_comgate_state_change_request
       skip
     end
 
-    def test_create_reccuring_payments
-      skip
-      # gateway.start_reccuring_transaction(payment_data)
+    def test_create_reccuring_payments # rubocop:disable Metrics/AbcSize
+      payment_params = minimal_payment_params
 
-      # gateway.repeat_transaction(transaction_id: ":transID", payment_data: payment_data }})
+      # inital is common payment with `initRecurring` tag
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       initRecurring: true,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        transaction_id: "AB12-CD34-EF56",
+                                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
+                       test_call: true }
+
+      result = expect_api_call_with(expectations) do
+        gateway.start_recurring_transaction(payment_params)
+      end
+
+      assert result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
+      assert_equal expectations[:response_hash][:redirect], result.redirect_to
+
+      transaction_id = result.response_hash[:transaction_id]
+      assert !transaction_id.nil?
+
+      # next payment is on background
+      new_payment_params = payment_params
+      new_payment_params[:payment][:price_in_cents] = 4_200
+
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/recurring",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       initRecurringId: transaction_id,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        transaction_id: "XB11-CD34-EF56" },
+                       test_call: true }
+
+      result = expect_api_call_with(expectations) do
+        gateway.repeat_recurring_transaction(transaction_id: transaction_id, payment_data: new_payment_params)
+      end
+
+      assert !result.redirect?
+      assert_nil result.redirect_to
+      assert_equal(expectations[:response_hash], result.response_hash)
+
+      new_transaction_id = result.response_hash[:transaction_id]
+      assert !new_transaction_id.nil?
+      assert transaction_id != new_transaction_id
     end
 
     def test_create_verification_payment = skip
@@ -101,11 +164,143 @@ module Comgate
 
     def test_cancel_payment = skip
 
-    def test_get_payment_state = skip
+    def test_get_payment_state
+      transaction_id = "1234-4567-89AB"
 
-    def test_get_available_payment_methods = skip
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/status",
+                       call_payload: { merchant: gateway_options[:merchant_gateway_id],
+                                       transId: transaction_id,
+                                       secret: gateway_options[:secret] },
+
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        merchant: gateway_options[:merchant_gateway_id].to_s,
+                                        test: "false",
+                                        price: "12900",
+                                        curr: "CZK",
+                                        label: "Automaticky obnovované předplatné pro ABC",
+                                        refId: "62bdf52e1fdcdd5f02d",
+                                        method: "CARD_CZ_CSOB_2",
+                                        email: "payer1@gmail.com",
+                                        name: "product name ABC",
+                                        transId: "3IX8-NZ9I-KDTO",
+                                        secret: "other_secret",
+                                        status: "PAID",
+                                        fee: "unknown",
+                                        vs: "739689656",
+                                        payer_acc: "account_num",
+                                        payerAcc: "account_num_again",
+                                        payer_name: "me",
+                                        payerName: "me again!",
+                                        headers: {} },
+                       test_call: false }
+
+      result = expect_api_call_with(expectations) do
+        gateway.check_state(transaction_id: transaction_id)
+      end
+
+      expected_gateway_response_hash = {
+        code: 0,
+        message: "OK",
+        merchant: "some_id_from_comgate",
+        test: "false",
+        transaction_id: "3IX8-NZ9I-KDTO",
+        status: "PAID",
+        payment: {
+          price_in_cents: "12900",
+          currency: "CZK",
+          label: "Automaticky obnovované předplatné pro ABC",
+          reference_id: "62bdf52e1fdcdd5f02d",
+          method: "CARD_CZ_CSOB_2",
+          product_name: "product name ABC",
+          fee: "unknown",
+          variable_symbol: "739689656"
+        },
+        payer: {
+          email: "payer1@gmail.com",
+          account_number: "account_num_again",
+          account_name: "me again!"
+        },
+        headers: {}
+      }
+      assert !result.redirect?
+      assert_nil result.redirect_to
+      assert_equal expected_gateway_response_hash, result.response_hash
+    end
+
+    def test_get_available_payment_methods
+      result_hash = { methods: [
+        {
+          id: "CARD_CZ_CSOB_2",
+          name: "Platební karta",
+          description: "On-line platba platební kartou.",
+          logo: "https://payments.comgate.cz/assets/images/logos/CARD_CZ_CSOB_2.png?v=1.4"
+        },
+        {
+          id: "APPLEPAY_REDIRECT",
+          name: "Apple Pay",
+          description: "On-line platba pomocí Apple Pay.",
+          logo: "https://payments.comgate.cz/assets/images/logos/APPLEPAY_REDIRECT.png?v=1.4"
+        },
+        {
+          id: "GOOGLEPAY_REDIRECT",
+          name: "Google Pay",
+          description: "On-line platba pomocí Google Pay.",
+          logo: "https://payments.comgate.cz/assets/images/logos/GOOGLEPAY_REDIRECT.png?v=1.4"
+        },
+        {
+          id: "LATER_TWISTO",
+          name: "Twisto",
+          description: "Twisto - Platba do 30 dnů",
+          logo: "https://payments.comgate.cz/assets/images/logos/LATER_TWISTO.png?v=1.4"
+        },
+        {
+          id: "PART_TWISTO",
+          name: "Twisto Nákup na třetiny",
+          description: "Bez navýšení, ve třech měsíčních splátkách",
+          logo: "https://payments.comgate.cz/assets/images/logos/PART_TWISTO.png?v=1.4"
+        },
+        {
+          id: "BANK_CZ_RB",
+          name: "Raiffeisenbank",
+          description: "On-line platba pro majitele účtu u Raiffeisenbank.",
+          logo: "https://payments.comgate.cz/assets/images/logos/BANK_CZ_RB.png?v=1.4"
+        },
+        {
+          id: "BANK_CZ_OTHER",
+          name: "Ostatní banky",
+          description: "Bankovní převod pro majitele účtu u jiné banky (CZ).",
+          logo: "https://payments.comgate.cz/assets/images/logos/BANK_CZ_OTHER.png?v=1.4"
+        }
+      ] }
+
+      params = { # same structure as for payments
+        payment: { currency: "EUR" },
+        options: { language_code: "sk",
+                   country_code: "SK" }
+      }
+
+      full_params_expectations = {
+        call_url: "https://payments.comgate.cz/v1.0/methods",
+        call_payload: { lang: params[:options][:language_code],
+                        curr: params[:payment][:currency],
+                        country: params[:options][:country_code],
+                        merchant: gateway_options[:merchant_gateway_id],
+                        secret: gateway_options[:secret] },
+        response_hash: result_hash,
+        test_call: false
+      }
+
+      result = expect_api_call_with(full_params_expectations) do
+        gateway.allowed_payment_methods(params)
+      end
+
+      assert_equal result_hash, result.response_hash
+    end
 
     def test_get_transfers_list = skip
+
+    def test_handle_api_caller_errors = skip
 
     private
 
@@ -199,7 +394,6 @@ module Comgate
                                        return_value: successful_service_stub(api_result), &block)
 
       assert_equal 200, result.code
-      assert_equal(expectations[:response_hash], result.response_hash)
       result
     end
 

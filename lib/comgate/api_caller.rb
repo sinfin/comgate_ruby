@@ -2,6 +2,7 @@
 
 require "openssl"
 require "net/http"
+require "json"
 
 module Comgate
   class ApiCaller < BaseService
@@ -119,6 +120,7 @@ module Comgate
 
     def api_error?
       return false if response_redirect?
+      return false if result.response_hash[:code].nil?
 
       result.response_hash[:code].positive?
     end
@@ -145,9 +147,15 @@ module Comgate
     end
 
     def parsed_response_body
-      return {} if response.body == ""
+      resp = case response_content_type
+             when :url_encoded
+               URI.decode_www_form(response.body).to_h.deep_symbolize_keys
+             when :json
+               JSON.parse(response.body).to_h.deep_symbolize_keys
+             end
 
-      resp = URI.decode_www_form(response.body).to_h.symbolize_keys
+      return {} if resp.nil?
+
       resp[:code] = resp[:code].to_i if resp[:code]
       if resp[:error]
         resp[:error] = resp[:error].to_i
@@ -177,6 +185,19 @@ module Comgate
       response_uri = URI.parse(path_or_url)
       response_uri = URI.join(url, response_uri) if response_uri.relative?
       response_uri.to_s
+    end
+
+    def response_content_type
+      rct = response["content-type"]
+      return nil if rct.nil?
+
+      if rct.include?("json")
+        :json
+      elsif rct.include?("form-urlencoded")
+        :url_encoded
+      else
+        raise "Uncaptured content type: '#{rct}'"
+      end
     end
   end
 end

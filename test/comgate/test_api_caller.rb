@@ -3,6 +3,7 @@
 require "test_helper"
 require "net/http"
 
+# rubocop:disable Layout/LineLength
 module Comgate
   class TestApiCaller < Minitest::Test
     FAKE_URL = "http://test.me"
@@ -16,7 +17,7 @@ module Comgate
       api_response = HttpResponseStubStruct.new(code: "200",
                                                 body: "code=0&message=OK+%28may+be?%29",
                                                 uri: URI.parse(FAKE_URL),
-                                                headers: {})
+                                                headers: { "content-type" => "application/x-www-form-urlencoded; charset=UTF-8" })
       payload = { my_payload: "here" }
       url = "#{FAKE_URL}/create"
 
@@ -92,19 +93,19 @@ module Comgate
       end
 
       assert srv.result.redirect?
-      assert_equal({ Found: "", headers: {} }, srv.result.response_hash)
+      assert_equal({ headers: {} }, srv.result.response_hash)
       assert_equal expected_redirect_to_url, srv.result.redirect_to
     end
 
-    def test_redirect_if_response_is_200_and_params_inludes_redirect
+    def test_redirect_if_response_is_200_and_params_includes_redirect
       payload = { my_payload: "here" }
       url = "#{FAKE_URL}/create"
       expected_redirect_to_url = "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56"
 
       api_response = HttpResponseStubStruct.new(code: "200",
-                                                body: "code=0&message=OK&transId=AB12-CD34-EF56&redirect=https%3A%2F%2Fpayments.comgate.cz%2Fclient%2Finstructions%2Findex%3Fid%3DAB12-CD34-EF56", # rubocop:disable Layout/LineLength
+                                                body: "code=0&message=OK&transId=AB12-CD34-EF56&redirect=https%3A%2F%2Fpayments.comgate.cz%2Fclient%2Finstructions%2Findex%3Fid%3DAB12-CD34-EF56",
                                                 uri: URI.parse(FAKE_URL),
-                                                headers: {})
+                                                headers: { "content-type" => "application/x-www-form-urlencoded; charset=UTF-8" })
 
       matching_request = { method: "POST",
                            path: "/create",
@@ -122,6 +123,36 @@ module Comgate
       assert srv.result.redirect?
       assert_equal expected_response_hash, srv.result.response_hash
       assert_equal expected_redirect_to_url, srv.result.redirect_to
+    end
+
+    def test_handle_url_encoded_response
+      # DRY see: test_redirect_if_response_is_200_and_params_includes_redirect
+    end
+
+    def test_handle_json_response
+      expected_result_hash = {
+        methods: [
+          {
+            id: "CARD_CZ_CSOB_2",
+            name: "Platební karta"
+          },
+          {
+            id: "APPLEPAY_REDIRECT",
+            name: "Apple Pay"
+          }
+        ],
+        nested: { stuff: "here", and_also: "there" }
+      }
+
+      api_response = HttpResponseStubStruct.new(code: "200",
+                                                body: expected_result_hash.to_json,
+                                                uri: URI.parse(FAKE_URL),
+                                                headers: { "content-type" => "application/json; charset=UTF-8" })
+      srv = Net::HTTP.stub(:start, fake_http(api_response)) do
+        Comgate::ApiCaller.call(url: FAKE_URL, payload: {}, test_call: true)
+      end
+
+      assert_equal expected_result_hash.merge({ headers: {} }), srv.result.response_hash
     end
 
     private
@@ -159,7 +190,7 @@ module Comgate
       api_error_response = HttpResponseStubStruct.new(code: "200",
                                                       body: response_body,
                                                       uri: URI.parse("https://comgate.cz"),
-                                                      headers: {})
+                                                      headers: { "content-type" => "application/x-www-form-urlencoded; charset=UTF-8" })
 
       Net::HTTP.stub(:start, fake_http(api_error_response)) do
         Comgate::ApiCaller.call(url: request_hash[:url], payload: request_hash[:payload], test_call: true)
@@ -167,3 +198,4 @@ module Comgate
     end
   end
 end
+# rubocop:enable Layout/LineLength
