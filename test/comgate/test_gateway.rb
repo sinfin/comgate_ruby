@@ -152,7 +152,35 @@ module Comgate
       assert transaction_id != new_transaction_id
     end
 
-    def test_create_verification_payment = skip
+    def test_create_verification_payment # rubocop:disable Metrics/AbcSize
+      payment_params = minimal_payment_params
+
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       verification: true,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        transaction_id: "AB12-CD34-EF56",
+                                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
+                       test_call: true }
+
+      result = expect_api_call_with(expectations) do
+        gateway.start_verfication_transaction(payment_params)
+      end
+
+      assert result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
+      assert_equal expectations[:response_hash][:redirect], result.redirect_to
+      assert !result.response_hash[:transaction_id].nil?
+    end
 
     def test_create_preauthorizated_payment = skip
     def test_confirm_preauthorizated_payment = skip

@@ -72,6 +72,12 @@ module Comgate
                 test_call: test_call?(payment_data[:test]))
     end
 
+    def start_verfication_transaction(payment_data)
+      make_call(url: "#{BASE_URL}/create",
+                payload: single_payment_payload(payment_data).merge(verification: true),
+                test_call: test_call?(payment_data[:test]))
+    end
+
     def check_state(transaction_id:)
       make_call(url: "#{BASE_URL}/status",
                 payload: gateway_params.merge(transId: transaction_id),
