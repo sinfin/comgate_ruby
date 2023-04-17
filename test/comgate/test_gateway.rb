@@ -344,7 +344,7 @@ module Comgate
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 1309,
                                         message: "Nespravná cena" },
-                       errors: { api: ["errr"] },
+                       errors: { api: ["[Error #1309] Nesprávná cena"] },
                        test_call: true }
 
       exception = expect_failed_api_call_with(expectations) do

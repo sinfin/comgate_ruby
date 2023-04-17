@@ -31,23 +31,22 @@ module Comgate
     }.freeze
 
     def initialize(response_hash)
-      @response_hash = response_hash
+      @response_hash = response_hash || {}
+
+      @response_hash[:code] = @response_hash[:code].to_i if @response_hash[:code]
+
+      if @response_hash[:error]
+        @response_hash[:error] = @response_hash[:error].to_i
+        @response_hash[:code] = @response_hash[:error]
+      end
+
+      return unless @response_hash[:message].to_s == "" && @response_hash[:code]
+
+      @response_hash[:message] = RESPONSE_CODES[response_hash[:code]]
     end
 
-    def success?
-      code.zero?
-    end
-
-    def code
-      response_hash["code"].to_i
-    end
-
-    def message
-      response_hash["message"] || RESPONSE_CODES[code]
-    end
-
-    def transaction_id
-      response_hash["transId"]
+    def to_h
+      @response_hash
     end
   end
 end

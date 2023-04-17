@@ -72,6 +72,29 @@ module Comgate
       expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")
     end
 
+    def test_fill_in_missing_api_error_message
+      # from API docs
+      payload = { merchant: 123_456,
+                  transId: "AB12-CD34-EF56",
+                  secret: "x4q8OV3TJt6noJnfhjqJKyX3Z6Ych0y" }
+      url = "#{FAKE_URL}/status"
+      err_message = ""
+
+      service = call_returning_api_error({ error: 1400, message: err_message },
+                                         { url: url, payload: payload })
+
+      expected_response_hash = { code: 1400,
+                                 error: 1400,
+                                 headers: {},
+                                 message: "wrong query" }
+
+      expect(service).to be_failure, "Service should fail for non 0 code"
+      expect(service.result.http_code).to eql(200), "result.http_code should be 200"
+      expect(service.result.response_hash).to eql(expected_response_hash),
+                                              "result.response should be '#{expected_response_hash}'"
+      expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")
+    end
+
     def test_redirect_if_response_is_302 # rubocop:disable Naming/VariableNumber
       redirect_path = "/redirect/here/please"
 

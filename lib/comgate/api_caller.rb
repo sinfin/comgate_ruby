@@ -153,15 +153,7 @@ module Comgate
              when :json
                JSON.parse(response.body).to_h.deep_symbolize_keys
              end
-
-      return {} if resp.nil?
-
-      resp[:code] = resp[:code].to_i if resp[:code]
-      if resp[:error]
-        resp[:error] = resp[:error].to_i
-        resp[:code] = resp[:error]
-      end
-      resp
+      Comgate::Response.new(resp).to_h
     end
 
     def api_log(level, message)
