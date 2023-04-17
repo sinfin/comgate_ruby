@@ -84,7 +84,62 @@ module Comgate
     end
 
     def test_process_comgate_state_change_request
-      skip
+      mandatory_params = {
+        "curr" => "CZK",
+        "email" => "mail@me.at",
+        "label" => "Beatles",
+        "merchant" => "123456",
+        "price" => "10000",
+        "refId" => "20230302007",
+        "secret" => "gx4q8OV3TJt6noJnfhjqJKyX3Z6Ych0y",
+        "status" => "PAID",
+        "test" => "true",
+        "transId" => "AB12-CD34-EF56"
+      }
+
+      result = gateway.process_payment_callback(mandatory_params)
+
+      expected_result = {
+        transaction_id: mandatory_params["transId"],
+        state: :paid,
+        test: true,
+        merchant: { gateway_id: mandatory_params["merchant"] },
+        payer: { email: "mail@me.at" },
+        payment: { currency: "CZK",
+                   label: "Beatles",
+                   price_in_cents: 10_000,
+                   reference_id: "20230302007" }
+      }
+      expect(result).to eql(expected_result)
+
+      optional_params = {
+        "account" => "accc", # ?
+        "fee" => "3.42", # or  "unknown"
+        "method" => "CARD_CZ_CSOB_2",
+        "name" => "CD + book",
+        "payerId" => "pid", # ?
+        "payerName" => "payerName",
+        "payer_name" => "payer_name",
+        "phone" => "CALLING ELVIS",
+        "payerAcc" => "payerAccount",
+        "payer_acc" => "payer_account",
+        "vs" => "673989665"
+      }
+
+      result = gateway.process_payment_callback(mandatory_params.merge(optional_params))
+
+      optional_expected_result = {
+        merchant: { target_shop_account: optional_params["account"] },
+        payer: { account_name: optional_params["payer_name"],
+                 account_number: optional_params["payer_acc"],
+                 id: optional_params["payerId"],
+                 phone: optional_params["phone"] },
+        payment: { fee: "3.42",
+                   method: "CARD_CZ_CSOB_2",
+                   product_name: "CD + book", variable_symbol: 673_989_665 }
+      }
+
+      expect(result).to eql(expected_result.deep_merge(optional_expected_result))
     end
 
     def test_create_reccuring_payments # rubocop:disable Metrics/AbcSize
@@ -230,19 +285,19 @@ module Comgate
       expected_gateway_response_hash = {
         code: 0,
         message: "OK",
-        merchant: "some_id_from_comgate",
-        test: "false",
+        merchant: { gateway_id: "some_id_from_comgate" },
+        test: false,
         transaction_id: "3IX8-NZ9I-KDTO",
-        status: "PAID",
+        state: :paid,
         payment: {
-          price_in_cents: "12900",
+          price_in_cents: 12_900,
           currency: "CZK",
           label: "Automaticky obnovované předplatné pro ABC",
           reference_id: "62bdf52e1fdcdd5f02d",
           method: "CARD_CZ_CSOB_2",
           product_name: "product name ABC",
-          fee: "unknown",
-          variable_symbol: "739689656"
+          fee: nil,
+          variable_symbol: 739_689_656
         },
         payer: {
           email: "payer1@gmail.com",
@@ -326,7 +381,55 @@ module Comgate
       assert_equal result_hash, result.response_hash
     end
 
-    def test_get_transfers_list = skip
+    def test_get_transfers_list
+      time_as_date = Time.new(2023, 4, 14)
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/transferList",
+                       call_payload: { merchant: gateway_options[:merchant_gateway_id],
+                                       date: "2023-04-14",
+                                       secret: gateway_options[:secret] },
+                       response_hash: [ # from json array
+                         {
+                           transferId: 33_459_010,
+                           transferDate: "2023-04-14",
+                           accountCounterparty: "5637796002/5500",
+                           accountOutgoing: "242398277/0300",
+                           variableSymbol: "675881954"
+                         },
+                         {
+                           transferId: 33_459_009,
+                           transferDate: "2023-04-14",
+                           accountCounterparty: "5637796002/5500",
+                           accountOutgoing: "242398277/0300",
+                           variableSymbol: "675881281"
+                         }
+                       ],
+                       test_call: false }
+
+      result = expect_successful_api_call_with(expectations) do
+        gateway.transfers_from(time_as_date)
+      end
+
+      expected_gateway_response_hash = [ # from json array
+        {
+          transfer_id: 33_459_010,
+          transfer_date: "2023-04-14",
+          account_counterparty: "5637796002/5500",
+          account_outgoing: "242398277/0300",
+          variable_symbol: "675881954"
+        },
+        {
+          transfer_id: 33_459_009,
+          transfer_date: "2023-04-14",
+          account_counterparty: "5637796002/5500",
+          account_outgoing: "242398277/0300",
+          variable_symbol: "675881281"
+        }
+      ]
+
+      assert !result.redirect?
+      assert_nil result.redirect_to
+      assert_equal expected_gateway_response_hash, result.response_hash
+    end
 
     def test_raises_api_caller_errors # rubocop:disable Metrics/AbcSize
       payment_params = minimal_payment_params
@@ -434,8 +537,9 @@ module Comgate
     end
 
     def expect_successful_api_call_with(expectations, &block)
+      redirect_to = expectations[:response_hash].is_a?(Hash) ? expectations[:response_hash][:redirect] : nil
       api_result = Comgate::ApiCaller::ResultHash.new(http_code: 200,
-                                                      redirect_to: expectations[:response_hash][:redirect],
+                                                      redirect_to: redirect_to,
                                                       response_hash: expectations[:response_hash])
 
       result = expect_method_called_on(object: Comgate::ApiCaller,

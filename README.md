@@ -24,7 +24,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
   ```
 
 ### 2) prepare endpoint
- Comgate sends POST requests to your app about transactions updates. The URL of it needs to be setup in Comgate Client portal. At endpoint, just call `gateway.process_state_change(params)`, which will return
+ Comgate sends POST requests to your app about transactions updates. The URL of it needs to be setup in Comgate Client portal. At endpoint, just call `gateway.process_payment_callback(params)`, which will return
     `{state: :paid, transaction_id: ":transID"}` (at least). See bullets 4) and 5) in Single payment process bellow.
 ### 3) call appropriate method
  (see bellow)

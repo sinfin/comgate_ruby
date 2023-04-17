@@ -26,6 +26,7 @@ module Comgate
 
       # responses
       transId: %i[transaction_id],
+      transferId: %i[transfer_id],
       code: %i[code],
       message: %i[message],
       payerId: %i[payer id],
@@ -36,7 +37,15 @@ module Comgate
       fee: %i[payment fee],
       methods: %i[methods],
       redirect: %i[redirect],
-      vs: %i[payment variable_symbol]
+      vs: %i[payment variable_symbol],
+      variableSymbol: %i[variable_symbol],
+      transferDate: %i[transfer_date],
+      accountCounterparty: %i[account_counterparty],
+      accountOutgoing: %i[account_outgoing],
+      status: %i[state],
+      test: %i[test],
+      merchant: %i[merchant gateway_id],
+      secret: %i[secret]
     }.freeze
 
     attr_reader :options, :result
@@ -48,6 +57,7 @@ module Comgate
       end
 
       @redirect_to = nil
+      @response_hash_is_array = false
     end
 
     def test_calls_used?
@@ -84,11 +94,24 @@ module Comgate
                 test_call: false)
     end
 
+    def process_payment_callback(comgate_params)
+      @result = convert_comgate_params_to_data(comgate_params.to_h.deep_symbolize_keys)
+    end
+
     def allowed_payment_methods(params)
       ph = gateway_params.merge(convert_data_to_comgate_params(%i[curr lang country], params, required: false))
 
       make_call(url: "#{BASE_URL}/methods",
                 payload: ph,
+                test_call: false)
+    end
+
+    def transfers_from(date_or_time)
+      date_str = date_or_time.strftime("%Y-%m-%d")
+      @response_hash_is_array = true
+
+      make_call(url: "#{BASE_URL}/transferList",
+                payload: gateway_params.merge({ date: date_str }),
                 test_call: false)
     end
 
@@ -107,6 +130,19 @@ module Comgate
 
     def test_call?(test_from_data = nil)
       test_from_data.nil? ? test_calls_used? : (test_from_data == true)
+    end
+
+    def modify_api_call_result(result)
+      result.response_hash = if @response_hash_is_array
+                               result.response_hash.collect { |item| convert_comgate_params_to_data(item) }
+                             else
+                               convert_comgate_params_to_data(result.response_hash)
+                             end
+      result
+    end
+
+    def handle_failure_from(result)
+      raise result.errors.to_s
     end
 
     def single_payment_payload(payment_data)
@@ -142,10 +178,25 @@ module Comgate
       h
     end
 
-    def convert_comgate_params_to_data(comgate_params)
+    def convert_comgate_params_to_data(_comgate_params) # rubocop:disable Metrics/AbcSize
+      h = transform_comgate_params(comgate_keys)
+      h.delete(:secret)
+
+      h[:test] = (h[:test] == "true") if h[:test] && h[:test] != ""
+      h[:state] = h[:state].to_s.downcase.to_sym unless h[:state].nil?
+      h[:payment][:variable_symbol] = h.dig(:payment, :variable_symbol).to_i unless h.dig(:payment,
+                                                                                          :variable_symbol).nil?
+      h[:payment][:price_in_cents] = h.dig(:payment, :price_in_cents).to_i unless h.dig(:payment, :price_in_cents).nil?
+      h[:payment][:fee] = nil if h.dig(:payment, :fee) == "unknown"
+
+      h
+    end
+
+    def transform_comgate_params(_comgate_keys)
       h = {}
       comgate_params.each_pair do |k, v|
         build_keys = DATA_CONVERSION_HASH[k.to_sym]&.dup
+
         if build_keys.nil?
           h[k] = v
         else
@@ -158,17 +209,6 @@ module Comgate
           hash_at_level[last_key] = v
         end
       end
-      h
-    end
-
-    def modify_api_call_result(result)
-      result.response_hash.delete(:secret)
-      result.response_hash = convert_comgate_params_to_data(result.response_hash)
-      result
-    end
-
-    def handle_failure_from(result)
-      raise result.errors.to_s
     end
 
     # _url = "#{BASE_URL}/create"
