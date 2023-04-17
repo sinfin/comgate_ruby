@@ -37,7 +37,7 @@ module Comgate
         service = call_with_connection_error(error_class, url)
 
         expect(service).to be_failure, "Service should fail for #{error_class}"
-        expect(service.result.code).to eql(500), "result.code should be 500 for #{error_class}"
+        expect(service.result.http_code).to eql(500), "result.http_code should be 500 for #{error_class}"
         expect(service.result.response_hash).to eql({}), "result.response should be '' for #{error_class}"
         expect(service.errors[:connection]).to include("#{error_class} > #{url} - #{error_class.new.message}")
       end
@@ -66,7 +66,7 @@ module Comgate
                                  message: err_message }
 
       expect(service).to be_failure, "Service should fail for non 0 code"
-      expect(service.result.code).to eql(200), "result.code should be 200"
+      expect(service.result.http_code).to eql(200), "result.http_code should be 200"
       expect(service.result.response_hash).to eql(expected_response_hash),
                                               "result.response should be '#{expected_response_hash}'"
       expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")

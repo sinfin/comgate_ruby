@@ -35,7 +35,7 @@ module Comgate
                                         redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
                        test_call: true }
 
-      result = expect_api_call_with(expectations) do
+      result = expect_successful_api_call_with(expectations) do
         gateway.start_transaction(payment_params)
       end
 
@@ -73,7 +73,7 @@ module Comgate
                                         redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
                        test_call: false }
 
-      result = expect_api_call_with(expectations) do
+      result = expect_successful_api_call_with(expectations) do
         gateway.start_transaction(payment_params)
       end
 
@@ -108,7 +108,7 @@ module Comgate
                                         redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
                        test_call: true }
 
-      result = expect_api_call_with(expectations) do
+      result = expect_successful_api_call_with(expectations) do
         gateway.start_recurring_transaction(payment_params)
       end
 
@@ -139,7 +139,7 @@ module Comgate
                                         transaction_id: "XB11-CD34-EF56" },
                        test_call: true }
 
-      result = expect_api_call_with(expectations) do
+      result = expect_successful_api_call_with(expectations) do
         gateway.repeat_recurring_transaction(transaction_id: transaction_id, payment_data: new_payment_params)
       end
 
@@ -172,7 +172,7 @@ module Comgate
                                         redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
                        test_call: true }
 
-      result = expect_api_call_with(expectations) do
+      result = expect_successful_api_call_with(expectations) do
         gateway.start_verfication_transaction(payment_params)
       end
 
@@ -182,9 +182,9 @@ module Comgate
       assert !result.response_hash[:transaction_id].nil?
     end
 
-    def test_create_preauthorizated_payment = skip
-    def test_confirm_preauthorizated_payment = skip
-    def test_cancel_preauthorizated_payment = skip
+    def test_create_preauthorized_payment = skip
+    def test_confirm_preauthorized_payment = skip
+    def test_cancel_preauthorized_payment = skip
 
     def test_refund_payment
       # partial or whole
@@ -223,7 +223,7 @@ module Comgate
                                         headers: {} },
                        test_call: false }
 
-      result = expect_api_call_with(expectations) do
+      result = expect_successful_api_call_with(expectations) do
         gateway.check_state(transaction_id: transaction_id)
       end
 
@@ -319,7 +319,7 @@ module Comgate
         test_call: false
       }
 
-      result = expect_api_call_with(full_params_expectations) do
+      result = expect_successful_api_call_with(full_params_expectations) do
         gateway.allowed_payment_methods(params)
       end
 
@@ -328,7 +328,32 @@ module Comgate
 
     def test_get_transfers_list = skip
 
-    def test_handle_api_caller_errors = skip
+    def test_raises_api_caller_errors # rubocop:disable Metrics/AbcSize
+      payment_params = minimal_payment_params
+
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       verification: true,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 1309,
+                                        message: "Nespravná cena" },
+                       errors: { api: ["errr"] },
+                       test_call: true }
+
+      exception = expect_failed_api_call_with(expectations) do
+        gateway.start_verfication_transaction(payment_params)
+      end
+
+      assert_equal RuntimeError, exception.class
+      assert_equal expectations[:errors].to_s, exception.message
+    end
 
     private
 
@@ -408,8 +433,8 @@ module Comgate
                                                   })
     end
 
-    def expect_api_call_with(expectations, &block)
-      api_result = Comgate::ApiCaller::ResultHash.new(code: 200,
+    def expect_successful_api_call_with(expectations, &block)
+      api_result = Comgate::ApiCaller::ResultHash.new(http_code: 200,
                                                       redirect_to: expectations[:response_hash][:redirect],
                                                       response_hash: expectations[:response_hash])
 
@@ -419,35 +444,44 @@ module Comgate
                                        kwargs: { url: expectations[:call_url],
                                                  payload: expectations[:call_payload],
                                                  test_call: expectations[:test_call] },
-                                       return_value: successful_service_stub(api_result), &block)
+                                       return_value: service_stub(true, api_result, {}),
+                                       &block)
 
-      assert_equal 200, result.code
+      assert_equal 200, result.http_code
       result
     end
 
-    ServiceStubStruct = Struct.new(:success?, :errors, :result, keyword_init: true)
-    def successful_service_stub(result)
-      ServiceStubStruct.new(success?: true,
-                            errors: {},
-                            result: result)
+    def expect_failed_api_call_with(expectations, &block)
+      api_result = Comgate::ApiCaller::ResultHash.new(http_code: 200,
+                                                      response_hash: expectations[:response_hash])
+
+      assert_raises "xxx" do
+        expect_method_called_on(object: Comgate::ApiCaller,
+                                method: :call,
+                                args: [],
+                                kwargs: { url: expectations[:call_url],
+                                          payload: expectations[:call_payload],
+                                          test_call: expectations[:test_call] },
+                                return_value: service_stub(false, api_result, expectations[:errors]),
+                                      &block)
+      end
     end
 
-    # GOPAY params for inspiration
-    #     { payer: { allowed_payment_instruments: ["PAYMENT_CARD"],
-    #                           contact: { first_name: 'John',
-    #                                      last_name: 'Doe',
-    #                                      email: 'john@example.com',
-    #                                      phone: } },
-    #                  amount: 10000, # in cents
-    #                  currency: 'CZK',
-    #                  order_number: 'order-1',
-    #                  order_description: 'foo',
-    #                  lang: 'CS',
-    #                  callback: { return_url: 'http://localhost',
-    #                                           notification_url: 'http://localhost/2' } } }
-    # let(:recurrence_params) { { recurrence: { recurrence_cycle: 'WEEK',
-    #                                            recurrence_period: 10,
-    #                                            recurrence_date_to: '2050-01-01' } } }
+    ServiceStubStruct = Struct.new(:success?, :errors, :result, keyword_init: true) do
+      def failure?
+        !success?
+      end
+
+      def failed?
+        failure?
+      end
+    end
+
+    def service_stub(success, result, errors)
+      ServiceStubStruct.new(success?: success,
+                            errors: errors,
+                            result: result)
+    end
 
     # PATHS
     # 1.0/capturePreauth

@@ -101,7 +101,7 @@ module Comgate
       if srv.success?
         @result = modify_api_call_result(srv.result)
       else
-        pass_failure_from(srv)
+        handle_failure_from(srv)
       end
     end
 
@@ -167,7 +167,7 @@ module Comgate
       result
     end
 
-    def pass_failure_from(result)
+    def handle_failure_from(result)
       raise result.errors.to_s
     end
 

@@ -20,7 +20,7 @@ module Comgate
 
     attr_reader :payload, :url, :redirect_to
 
-    ResultHash = Struct.new(:code, :redirect_to, :response_hash, keyword_init: true) do
+    ResultHash = Struct.new(:http_code, :redirect_to, :response_hash, keyword_init: true) do
       def redirect?
         !redirect_to.nil?
       end
@@ -55,7 +55,7 @@ module Comgate
       api_log(:debug, "Comgate API RESPONSE: #{response} with body:\n#{response.body}")
 
       set_redirection
-      @result = ResultHash.new(code: response.code.to_i,
+      @result = ResultHash.new(http_code: response.code.to_i,
                                redirect_to: redirect_to,
                                response_hash: parsed_response)
 
@@ -130,7 +130,7 @@ module Comgate
     end
 
     def handle_connection_error(error)
-      @result = ResultHash.new(code: 500, response_hash: {})
+      @result = ResultHash.new(http_code: 500, response_hash: {})
       errors[:connection] = ["#{error.class} > #{service_uri} - #{error}"]
     end
 
