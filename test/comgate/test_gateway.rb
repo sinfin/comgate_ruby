@@ -177,6 +177,7 @@ module Comgate
       # next payment is on background
       new_payment_params = payment_params
       new_payment_params[:payment][:price_in_cents] = 4_200
+      new_payment_params[:transaction_id] = transaction_id
 
       expectations = { call_url: "https://payments.comgate.cz/v1.0/recurring",
                        call_payload: { curr: payment_params[:payment][:currency],
@@ -195,7 +196,7 @@ module Comgate
                        test_call: true }
 
       result = expect_successful_api_call_with(expectations) do
-        gateway.repeat_recurring_transaction(transaction_id: transaction_id, payment_data: new_payment_params)
+        gateway.repeat_recurring_transaction(new_payment_params)
       end
 
       assert !result.redirect?
@@ -268,20 +269,19 @@ module Comgate
     end
 
     def test_confirm_preauthorized_payment
-      transaction_id = "AB12-CD34-EF56" # preauthorized transtaction created in past
-
-      reduced_price = 200
+      params = { transaction_id: "AB12-CD34-EF56", # preauthorized transtaction created in past
+                 payment: { price_in_cents: 200 } }
       confirm_expectations = { call_url: "https://payments.comgate.cz/v1.0/capturePreauth",
                                call_payload: { merchant: gateway_options[:merchant_gateway_id],
-                                               amount: reduced_price,
-                                               transId: transaction_id,
+                                               amount: params[:payment][:price_in_cents],
+                                               transId: params[:transaction_id],
                                                secret: gateway_options[:secret] },
                                response_hash: { code: 0,
                                                 message: "OK" },
                                test_call: false }
 
       result = expect_successful_api_call_with(confirm_expectations) do
-        gateway.confirm_preauthorized_transaction(transaction_id: transaction_id, price_in_cents: reduced_price)
+        gateway.confirm_preauthorized_transaction(params)
       end
 
       assert !result.redirect?

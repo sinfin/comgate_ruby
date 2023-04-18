@@ -78,7 +78,8 @@ module Comgate
                 test_call: test_call?(payment_data[:test]))
     end
 
-    def repeat_recurring_transaction(transaction_id:, payment_data:)
+    def repeat_recurring_transaction(payment_data)
+      transaction_id = payment_data.delete(:transaction_id)
       make_call(url: "#{BASE_URL}/recurring",
                 payload: single_payment_payload(payment_data).merge(initRecurringId: transaction_id),
                 test_call: test_call?(payment_data[:test]))
@@ -96,9 +97,11 @@ module Comgate
                 test_call: test_call?(payment_data[:test]))
     end
 
-    def confirm_preauthorized_transaction(transaction_id:, price_in_cents:)
+    def confirm_preauthorized_transaction(payment_data)
+      params = convert_data_to_comgate_params(%i[transId amount], payment_data, required: true)
+
       make_call(url: "#{BASE_URL}/capturePreauth",
-                payload: gateway_params.merge(transId: transaction_id, amount: price_in_cents),
+                payload: gateway_params.merge(params),
                 test_call: false)
     end
 
@@ -108,13 +111,13 @@ module Comgate
                 test_call: false)
     end
 
-    def refund_transaction(params)
-      refund_params = convert_data_to_comgate_params(%i[transId amount], params, required: true)
-      refund_params.merge!(convert_data_to_comgate_params(%i[curr refId], params, required: false))
+    def refund_transaction(payment_data)
+      refund_params = convert_data_to_comgate_params(%i[transId amount], payment_data, required: true)
+      refund_params.merge!(convert_data_to_comgate_params(%i[curr refId], payment_data, required: false))
 
       make_call(url: "#{BASE_URL}/refund",
                 payload: gateway_params.merge(refund_params),
-                test_call: test_call?(params[:test]))
+                test_call: test_call?(payment_data[:test]))
     end
 
     def cancel_transaction(transaction_id:)
@@ -133,8 +136,8 @@ module Comgate
       @result = convert_comgate_params_to_data(comgate_params.to_h.deep_symbolize_keys)
     end
 
-    def allowed_payment_methods(params)
-      ph = gateway_params.merge(convert_data_to_comgate_params(%i[curr lang country], params, required: false))
+    def allowed_payment_methods(payment_data)
+      ph = gateway_params.merge(convert_data_to_comgate_params(%i[curr lang country], payment_data, required: false))
 
       make_call(url: "#{BASE_URL}/methods",
                 payload: ph,
