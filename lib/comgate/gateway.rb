@@ -10,8 +10,8 @@ module Comgate
       email: %i[payer email],
       label: %i[payment label],
       method: %i[payment method],
-      price: %i[payment price_in_cents],
-      amount: %i[payment price_in_cents],
+      price: %i[payment amount_in_cents],
+      amount: %i[payment amount_in_cents],
       refId: %i[payment reference_id],
       account: %i[merchant target_shop_account],
       applePayPayload: %i[payment apple_pay_payload],
@@ -228,9 +228,12 @@ module Comgate
 
       h[:test] = (h[:test] == "true") if h[:test] && h[:test] != ""
       h[:state] = h[:state].to_s.downcase.to_sym unless h[:state].nil?
-      h[:payment][:variable_symbol] = h.dig(:payment, :variable_symbol).to_i unless h.dig(:payment,
-                                                                                          :variable_symbol).nil?
-      h[:payment][:price_in_cents] = h.dig(:payment, :price_in_cents).to_i unless h.dig(:payment, :price_in_cents).nil?
+      unless h.dig(:payment, :variable_symbol).nil?
+        h[:payment][:variable_symbol] = h.dig(:payment, :variable_symbol).to_i
+      end
+      unless h.dig(:payment, :amount_in_cents).nil?
+        h[:payment][:amount_in_cents] = h.dig(:payment, :amount_in_cents).to_i
+      end
       h[:payment][:fee] = nil if h.dig(:payment, :fee) == "unknown"
 
       h
@@ -265,7 +268,7 @@ module Comgate
     #   merchant: "x", # Comgate shop identifier (see  Client Portal -> e-shop settings -> e-shop connection)
     #   payment_method: "x", # "ALL" will offer methods to chose from
     #   prepare_only: false, # background payment?
-    #   price_in_cents: 1, # cents, pennies, halere.
+    #   amount_in_cents: 1, # cents, pennies, halere.
     #                            Must be in minimum of 1 CZK; 0,1 EUR; 1 PLN; 100 HUF;
     #                            1 USD; 1 GBP; 5 RON; 0,5 NOK; 0,5 SEK.
     #                            reccuring_payment_id: "x", # payment_id from initall reccuring payment

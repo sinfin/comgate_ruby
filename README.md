@@ -118,7 +118,7 @@ Maximal mixed version looks like:
       target_shop_account: "12345678/1234", # input (change against default)/ output
     },
     payment: {
-        price_in_cents: 12_900, # input/output
+        amount_in_cents: 12_900, # input/output
         currency: "CZK", # input/output
         label: "Payment for 2 straws", # input/output
         reference_id: "our eshop order #1 reference", # input/output

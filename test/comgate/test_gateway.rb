@@ -26,7 +26,7 @@ module Comgate
                                        merchant: gateway_options[:merchant_gateway_id],
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 0,
@@ -56,7 +56,7 @@ module Comgate
                                        merchant: gateway_options[:merchant_gateway_id],
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret],
                                        account: payment_params[:merchant][:target_shop_account],
@@ -107,7 +107,7 @@ module Comgate
         payer: { email: "mail@me.at" },
         payment: { currency: "CZK",
                    label: "Beatles",
-                   price_in_cents: 10_000,
+                   amount_in_cents: 10_000,
                    reference_id: "20230302007" }
       }
       expect(result).to eql(expected_result)
@@ -154,7 +154,7 @@ module Comgate
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
                                        initRecurring: true,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 0,
@@ -176,7 +176,7 @@ module Comgate
 
       # next payment is on background
       new_payment_params = payment_params
-      new_payment_params[:payment][:price_in_cents] = 4_200
+      new_payment_params[:payment][:amount_in_cents] = 4_200
       new_payment_params[:transaction_id] = transaction_id
 
       expectations = { call_url: "https://payments.comgate.cz/v1.0/recurring",
@@ -187,7 +187,7 @@ module Comgate
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
                                        initRecurringId: transaction_id,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 0,
@@ -219,7 +219,7 @@ module Comgate
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
                                        verification: true,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 0,
@@ -249,7 +249,7 @@ module Comgate
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
                                        preauth: true,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 0,
@@ -270,10 +270,10 @@ module Comgate
 
     def test_confirm_preauthorized_payment
       params = { transaction_id: "AB12-CD34-EF56", # preauthorized transtaction created in past
-                 payment: { price_in_cents: 200 } }
+                 payment: { amount_in_cents: 200 } }
       confirm_expectations = { call_url: "https://payments.comgate.cz/v1.0/capturePreauth",
                                call_payload: { merchant: gateway_options[:merchant_gateway_id],
-                                               amount: params[:payment][:price_in_cents],
+                                               amount: params[:payment][:amount_in_cents],
                                                transId: params[:transaction_id],
                                                secret: gateway_options[:secret] },
                                response_hash: { code: 0,
@@ -309,14 +309,14 @@ module Comgate
 
     def test_refund_payment
       params = { payment: { currency: "CZK", # optional
-                            price_in_cents: 200, # 2 CZK
+                            amount_in_cents: 200, # 2 CZK
                             reference_id: "#2023-0123" }, # optional
                  transaction_id: "1234-abcd-5678" }
 
       expectations = { call_url: "https://payments.comgate.cz/v1.0/refund",
                        call_payload: { curr: params[:payment][:currency],
                                        transId: params[:transaction_id],
-                                       amount: params[:payment][:price_in_cents],
+                                       amount: params[:payment][:amount_in_cents],
                                        merchant: gateway_options[:merchant_gateway_id],
                                        refId: params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
@@ -393,7 +393,7 @@ module Comgate
         transaction_id: "3IX8-NZ9I-KDTO",
         state: :paid,
         payment: {
-          price_in_cents: 12_900,
+          amount_in_cents: 12_900,
           currency: "CZK",
           label: "Automaticky obnovované předplatné pro ABC",
           reference_id: "62bdf52e1fdcdd5f02d",
@@ -545,7 +545,7 @@ module Comgate
                                        method: payment_params[:payment][:method],
                                        prepareOnly: true,
                                        verification: true,
-                                       price: payment_params[:payment][:price_in_cents],
+                                       price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
                                        secret: gateway_options[:secret] },
                        response_hash: { code: 1309,
@@ -579,7 +579,7 @@ module Comgate
       {
         payer: { email: "joh@eaxample.com" },
         payment: { currency: "CZK",
-                   price_in_cents: 100, # 1 CZK
+                   amount_in_cents: 100, # 1 CZK
                    label: "#2023-0123",
                    reference_id: "#2023-0123",
                    method: "ALL" }
@@ -590,7 +590,7 @@ module Comgate
       {
         payer: { email: "joh@example.com" },
         payment: { currency: "CZK",
-                   price_in_cents: 100, # 1 CZK
+                   amount_in_cents: 100, # 1 CZK
                    label: "#2023-0123-4",
                    reference_id: "#2023-0123",
                    init_payment_id: "dadasdaewvcxb" }
