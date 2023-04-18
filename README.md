@@ -45,7 +45,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Preauthorized payments
 1) Use `gateway.start_preauthorized_transaction(payment_data)` and store `transaction_id`.
-2a) Confirm payment by `gateway.authorize_transaction(transaction_id: ":transID", payment_data)` (price cannot exceed preauthorized amount)
+2a) Confirm payment by `gateway.confirm_preauthorized_transaction(transaction_id: ":transID", price_in_cents: :price)` (price cannot exceed preauthorized amount)
 2b) Cancel payment by `gateway.cancel_preauthorized_transaction(transaction_id: ":transID")`
 3) Handle status change like bullets 4) and 5) in single payment
 

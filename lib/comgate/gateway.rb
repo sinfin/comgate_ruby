@@ -11,6 +11,7 @@ module Comgate
       label: %i[payment label],
       method: %i[payment method],
       price: %i[payment price_in_cents],
+      amount: %i[payment price_in_cents],
       refId: %i[payment reference_id],
       account: %i[merchant target_shop_account],
       applePayPayload: %i[payment apple_pay_payload],
@@ -58,6 +59,7 @@ module Comgate
 
       @redirect_to = nil
       @response_hash_is_array = false
+      @errors = {}
     end
 
     def test_calls_used?
@@ -86,6 +88,39 @@ module Comgate
       make_call(url: "#{BASE_URL}/create",
                 payload: single_payment_payload(payment_data).merge(verification: true),
                 test_call: test_call?(payment_data[:test]))
+    end
+
+    def start_preauthorized_transaction(payment_data)
+      make_call(url: "#{BASE_URL}/create",
+                payload: single_payment_payload(payment_data).merge(preauth: true),
+                test_call: test_call?(payment_data[:test]))
+    end
+
+    def confirm_preauthorized_transaction(transaction_id:, price_in_cents:)
+      make_call(url: "#{BASE_URL}/capturePreauth",
+                payload: gateway_params.merge(transId: transaction_id, amount: price_in_cents),
+                test_call: false)
+    end
+
+    def cancel_preauthorized_transaction(transaction_id:)
+      make_call(url: "#{BASE_URL}/cancelPreauth",
+                payload: gateway_params.merge(transId: transaction_id),
+                test_call: false)
+    end
+
+    def refund_transaction(params)
+      refund_params = convert_data_to_comgate_params(%i[transId amount], params, required: true)
+      refund_params.merge!(convert_data_to_comgate_params(%i[curr refId], params, required: false))
+
+      make_call(url: "#{BASE_URL}/refund",
+                payload: gateway_params.merge(refund_params),
+                test_call: test_call?(params[:test]))
+    end
+
+    def cancel_transaction(transaction_id:)
+      make_call(url: "#{BASE_URL}/cancel",
+                payload: gateway_params.merge(transId: transaction_id),
+                test_call: false)
     end
 
     def check_state(transaction_id:)
@@ -117,9 +152,11 @@ module Comgate
 
     private
 
-    attr_reader :payment_data
+    attr_reader :payment_data, :errors
 
     def make_call(url:, payload:, test_call:)
+      raise "There are errors in pre-api-call phase: #{errors}" unless errors.empty?
+
       srv = Comgate::ApiCaller.call(url: url, payload: payload, test_call: test_call)
       if srv.success?
         @result = modify_api_call_result(srv.result)
@@ -146,6 +183,7 @@ module Comgate
     end
 
     def single_payment_payload(payment_data)
+      @errors = {}
       required_keys = %i[curr email label method price refId]
       optional_keys = %i[account applePayPayload country dynamicExpiration embedded expirationTime lang name phone
                          preauth verification]
@@ -170,7 +208,10 @@ module Comgate
 
         value = data.dig(*dig_keys)
         if value.nil?
-          errors[:params] << "Missing value for param #{dig_keys.join(" =>")}" if required
+          if required
+            errors[:params] = [] if errors[:params].nil?
+            errors[:params] << "Missing value for param #{dig_keys.join(" =>")}"
+          end
         else
           h[comg_key] = value
         end
@@ -178,8 +219,8 @@ module Comgate
       h
     end
 
-    def convert_comgate_params_to_data(_comgate_params) # rubocop:disable Metrics/AbcSize
-      h = transform_comgate_params(comgate_keys)
+    def convert_comgate_params_to_data(comgate_params) # rubocop:disable Metrics/AbcSize
+      h = transform_comgate_params(comgate_params)
       h.delete(:secret)
 
       h[:test] = (h[:test] == "true") if h[:test] && h[:test] != ""
@@ -192,7 +233,7 @@ module Comgate
       h
     end
 
-    def transform_comgate_params(_comgate_keys)
+    def transform_comgate_params(comgate_params)
       h = {}
       comgate_params.each_pair do |k, v|
         build_keys = DATA_CONVERSION_HASH[k.to_sym]&.dup
@@ -209,6 +250,7 @@ module Comgate
           hash_at_level[last_key] = v
         end
       end
+      h
     end
 
     # _url = "#{BASE_URL}/create"

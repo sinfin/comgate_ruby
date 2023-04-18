@@ -237,15 +237,118 @@ module Comgate
       assert !result.response_hash[:transaction_id].nil?
     end
 
-    def test_create_preauthorized_payment = skip
-    def test_confirm_preauthorized_payment = skip
-    def test_cancel_preauthorized_payment = skip
+    def test_create_preauthorized_payment # rubocop:disable Metrics/AbcSize
+      payment_params = minimal_payment_params
 
-    def test_refund_payment
-      # partial or whole
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       preauth: true,
+                                       price: payment_params[:payment][:price_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK",
+                                        transaction_id: "AB12-CD34-EF56",
+                                        redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }, # rubocop:disable Layout/LineLength
+                       test_call: true }
+
+      result = expect_successful_api_call_with(expectations) do
+        gateway.start_preauthorized_transaction(payment_params)
+      end
+
+      assert result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
+      assert_equal expectations[:response_hash][:redirect], result.redirect_to
+      assert !result.response_hash[:transaction_id].nil?
     end
 
-    def test_cancel_payment = skip
+    def test_confirm_preauthorized_payment
+      transaction_id = "AB12-CD34-EF56" # preauthorized transtaction created in past
+
+      reduced_price = 200
+      confirm_expectations = { call_url: "https://payments.comgate.cz/v1.0/capturePreauth",
+                               call_payload: { merchant: gateway_options[:merchant_gateway_id],
+                                               amount: reduced_price,
+                                               transId: transaction_id,
+                                               secret: gateway_options[:secret] },
+                               response_hash: { code: 0,
+                                                message: "OK" },
+                               test_call: false }
+
+      result = expect_successful_api_call_with(confirm_expectations) do
+        gateway.confirm_preauthorized_transaction(transaction_id: transaction_id, price_in_cents: reduced_price)
+      end
+
+      assert !result.redirect?
+      assert_equal(confirm_expectations[:response_hash], result.response_hash)
+    end
+
+    def test_cancel_preauthorized_payment
+      transaction_id = "AB12-CD34-EF56" # preauthorized transtaction created in past
+
+      confirm_expectations = { call_url: "https://payments.comgate.cz/v1.0/cancelPreauth",
+                               call_payload: { merchant: gateway_options[:merchant_gateway_id],
+                                               transId: transaction_id,
+                                               secret: gateway_options[:secret] },
+                               response_hash: { code: 0,
+                                                message: "OK" },
+                               test_call: false }
+
+      result = expect_successful_api_call_with(confirm_expectations) do
+        gateway.cancel_preauthorized_transaction(transaction_id: transaction_id)
+      end
+
+      assert !result.redirect?
+      assert_equal(confirm_expectations[:response_hash], result.response_hash)
+    end
+
+    def test_refund_payment
+      params = { payment: { currency: "CZK", # optional
+                            price_in_cents: 200, # 2 CZK
+                            reference_id: "#2023-0123" }, # optional
+                 transaction_id: "1234-abcd-5678" }
+
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/refund",
+                       call_payload: { curr: params[:payment][:currency],
+                                       transId: params[:transaction_id],
+                                       amount: params[:payment][:price_in_cents],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       refId: params[:payment][:reference_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK" },
+                       test_call: true }
+
+      result = expect_successful_api_call_with(expectations) do
+        gateway.refund_transaction(params)
+      end
+
+      assert !result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
+    end
+
+    def test_cancel_payment
+      transaction_id = "1234-asdf-4567"
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/cancel",
+                       call_payload: { transId: transaction_id,
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       secret: gateway_options[:secret] },
+                       response_hash: { code: 0,
+                                        message: "OK" },
+                       test_call: false }
+
+      result = expect_successful_api_call_with(expectations) do
+        gateway.cancel_transaction(transaction_id: transaction_id)
+      end
+
+      assert !result.redirect?
+      assert_equal(expectations[:response_hash], result.response_hash)
+    end
 
     def test_get_payment_state
       transaction_id = "1234-4567-89AB"
@@ -486,7 +589,7 @@ module Comgate
 
     def minimal_reccuring_payment_params
       {
-        payer: { email: "joh@eaxample.com" },
+        payer: { email: "joh@example.com" },
         merchant: { gateway_id: "sdasdsadad546dfa" }, # gateway variable
         payment: { currency: "CZK",
                    price_in_cents: 100, # 1 CZK
