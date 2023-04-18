@@ -31,8 +31,16 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ## Usecases
 ### Single payment process
-1) Start transaction by `gateway.start_transaction(payment_data)`. Response contains `transaction_id` and `redirect_to`.
-2) Redirect user to `redirect_to` page (Comgate form).
+1) Start transaction by `gateway.start_transaction(payment_data)`. Response look like
+      ```ruby
+         {
+           code: 0,
+           message: "OK",
+           transaction_id: "AB12-CD34-EF56"
+           redirect_to: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56"
+         }
+      ```
+2) Redirect user to `redirect_to` page (=> display Comgate form).
 3) Client will (not) pay.
 4) Comgate will send request to your defined endpoint about status change of transaction. Call `gateway.process_state_change(payload)`, which will return
   `{state: :paid, transaction_id: ":transID"}`(and maybe some more informations).
@@ -45,7 +53,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Preauthorized payments
 1) Use `gateway.start_preauthorized_transaction(payment_data)` and store `transaction_id`.
-2a) Confirm payment by `gateway.confirm_preauthorized_transaction(transaction_id: ":transID", price_in_cents: :price)` (price cannot exceed preauthorized amount)
+2a) Confirm payment by `gateway.confirm_preauthorized_transaction(payment_data)` (price cannot exceed preauthorized amount)
 2b) Cancel payment by `gateway.cancel_preauthorized_transaction(transaction_id: ":transID")`
 3) Handle status change like bullets 4) and 5) in single payment
 
@@ -68,7 +76,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 2) Handle status change like bullet 5) in single payment
 
 ### Get payment methods allowed to merchant
-1) Call `gateway.allowed_payment_methods`. It will return array of allowed payment methods.
+1) Call `gateway.allowed_payment_methods(params)`. It will return array of allowed payment methods.
    ```ruby
     [
       { id: "BANK_CZ_CS_P",
@@ -92,6 +100,54 @@ If bundler is not being used to manage dependencies, install the gem by executin
         account_outgoing: "123456789/0000",
         variable_symbol: "12345678"}
     ]
+
+## Parameters
+Structure of parameters is unchanged across most of methods, but you can leave out unused keys. You will get error if You  do not pass required key.
+See `test/comgate/test_gateway.rb` for examples.
+Also returned hash have consistent structure (very similar to input params)
+Maximal mixed version looks like:
+```ruby
+  {
+    code: 0, # output
+    message: "OK", # output
+    transfer_id: "1234-abcd-45678", # input/output
+    test: true, # input (handle as test call)/ output (created by test call)
+    state: :paid, # output
+    merchant: {
+      gateway_id: "some_id_from_comgate", # output (input is set at gateway init)
+      target_shop_account: "12345678/1234", # input (change against default)/ output
+    },
+    payment: {
+        price_in_cents: 12_900, # input/output
+        currency: "CZK", # input/output
+        label: "Payment for 2 straws", # input/output
+        reference_id: "our eshop order #1 reference", # input/output
+        method: "CARD_CZ_CSOB_2", # input (selected method; or use "ALL") / output
+        product_name: "product name ABC", # input/output
+        fee: nil, # output ( if automatic deduction of the payment fee is set at Comgate)
+        variable_symbol: 739_689_656, # output (so I acctually do not know where it came from)
+        apple_pay_payload: "raw apple pay payload", # input
+        dynamic_expiration: false, # input (see  https://help.comgate.cz/v1/docs/expirace-plateb )
+        expiration_time: "10h", # input ( use "m" or  "h" or "d", but only one of them; allowed rage "30m".."7d")
+    },
+    payer: {
+        email: "payer1@gmail.com", # input/output
+        phone: "+420778899", # input/output
+        account_number: "account_num", # output
+        account_name: "payer account name" # output
+    },
+    options: {
+      country_code: "DE", # input (can restrict allowed  payment methods)
+      language_code: "sk" # input
+    },
+    headers: {} # not actually used now
+  }
+```
+
+## Errors
+ Connection errors or API error responses are raised as RuntimeError with message like ` "{:api=>[\"[Error #1309] incorrect amount\"]}"`.
+ Error Number and text can be found in `lib/comgate/response.rb`.
+ This may be refactored in future.
 
 ## Development
 

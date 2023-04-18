@@ -578,7 +578,6 @@ module Comgate
     def minimal_payment_params
       {
         payer: { email: "joh@eaxample.com" },
-        # merchant: { gateway_id: "sdasdsadad546dfa" }, # gateway variable
         payment: { currency: "CZK",
                    price_in_cents: 100, # 1 CZK
                    label: "#2023-0123",
@@ -590,7 +589,6 @@ module Comgate
     def minimal_reccuring_payment_params
       {
         payer: { email: "joh@example.com" },
-        merchant: { gateway_id: "sdasdsadad546dfa" }, # gateway variable
         payment: { currency: "CZK",
                    price_in_cents: 100, # 1 CZK
                    label: "#2023-0123-4",
@@ -619,26 +617,6 @@ module Comgate
                                         })
     end
 
-    def maximal_reccuring_payment_params
-      minimal_reccuring_payment_params.deep_merge({
-                                                    payer: { phone: "+420777888999" },
-                                                    merchant: { target_shop_account: "12345678/1234" },
-                                                    payment: { apple_pay_payload: "x",
-                                                               dynamic_expiration: true,
-                                                               expiration_time: "10h",
-                                                               init_reccuring_payments: true,
-                                                               product_name: "Usefull things",
-                                                               preauthorization: false,
-                                                               verification_payment: true },
-                                                    options: {
-                                                      country_code: "DE",
-                                                      embedded_iframe: false, # redirection after payment
-                                                      lang_code: "sk"
-                                                    },
-                                                    test: true
-                                                  })
-    end
-
     def expect_successful_api_call_with(expectations, &block)
       redirect_to = expectations[:response_hash].is_a?(Hash) ? expectations[:response_hash][:redirect] : nil
       api_result = Comgate::ApiCaller::ResultHash.new(http_code: 200,
@@ -662,7 +640,7 @@ module Comgate
       api_result = Comgate::ApiCaller::ResultHash.new(http_code: 200,
                                                       response_hash: expectations[:response_hash])
 
-      assert_raises "xxx" do
+      assert_raises do
         expect_method_called_on(object: Comgate::ApiCaller,
                                 method: :call,
                                 args: [],
@@ -689,15 +667,5 @@ module Comgate
                             errors: errors,
                             result: result)
     end
-
-    # PATHS
-    # 1.0/capturePreauth
-    # https://payments.comgate.cz/v1.0/cancelPreauth
-    # https://payments.comgate.cz/v1.0/recurring
-    # https://payments.comgate.cz/v1.0/refund
-    # https://payments.comgate.cz/v1.0/cancel
-    # https://payments.comgate.cz/v1.0/status
-    # https://payments.comgate.cz/v1.0/methods
-    # https://payments.comgate.cz/v1.0/transferList
   end
 end
