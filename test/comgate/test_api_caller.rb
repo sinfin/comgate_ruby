@@ -30,20 +30,21 @@ module Comgate
       end
     end
 
-    def test_can_handle_connection_errors
+    def test_can_handle_connection_errors # rubocop:disable Metrics/AbcSize
       url = "#{FAKE_URL}/create"
 
       Comgate::ApiCaller::KNOWN_CONNECTION_ERRORS.each do |error_class|
         service = call_with_connection_error(error_class, url)
 
         expect(service).to be_failure, "Service should fail for #{error_class}"
-        expect(service.result.http_code).to eql(500), "result.http_code should be 500 for #{error_class}"
-        expect(service.result.response_hash).to eql({}), "result.response should be '' for #{error_class}"
+        expect(service.result[:http_code]).to eql(500), "result.http_code should be 500 for #{error_class}"
+        expect(service.result[:response_body]).to be_nil, "result.response_hash should be nil for #{error_class}"
         expect(service.errors[:connection]).to include("#{error_class} > #{url} - #{error_class.new.message}")
+        expect(service.result[:errors][:connection]).to include({ code: 500, message: "#{error_class} > #{url} - #{error_class.new.message}" })
       end
     end
 
-    def test_can_handle_api_errors
+    def test_can_handle_api_errors # rubocop:disable Metrics/AbcSize
       # from API docs
       payload = { merchant: 123_456,
                   transId: "AB12-CD34-EF56",
@@ -60,39 +61,15 @@ module Comgate
       service = call_returning_api_error({ error: 1400, message: err_message },
                                          { url: url, payload: payload })
 
-      expected_response_hash = { code: 1400,
-                                 error: 1400,
-                                 headers: {},
-                                 message: err_message }
+      expected_response_hash = { "error" => "1400",
+                                 "message" => err_message }
 
       expect(service).to be_failure, "Service should fail for non 0 code"
-      expect(service.result.http_code).to eql(200), "result.http_code should be 200"
-      expect(service.result.response_hash).to eql(expected_response_hash),
-                                              "result.response should be '#{expected_response_hash}'"
-      expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")
-    end
-
-    def test_fill_in_missing_api_error_message
-      # from API docs
-      payload = { merchant: 123_456,
-                  transId: "AB12-CD34-EF56",
-                  secret: "x4q8OV3TJt6noJnfhjqJKyX3Z6Ych0y" }
-      url = "#{FAKE_URL}/status"
-      err_message = ""
-
-      service = call_returning_api_error({ error: 1400, message: err_message },
-                                         { url: url, payload: payload })
-
-      expected_response_hash = { code: 1400,
-                                 error: 1400,
-                                 headers: {},
-                                 message: "wrong query" }
-
-      expect(service).to be_failure, "Service should fail for non 0 code"
-      expect(service.result.http_code).to eql(200), "result.http_code should be 200"
-      expect(service.result.response_hash).to eql(expected_response_hash),
-                                              "result.response should be '#{expected_response_hash}'"
-      expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash[:message]}")
+      expect(service.result[:http_code]).to eql(200), "result.http_code should be 200"
+      expect(service.result[:response_body]).to eql(expected_response_hash),
+                                                "result.response should be '#{expected_response_hash}'"
+      expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash["message"]}")
+      expect(service.result[:errors][:api]).to include({ code: 1400, message: expected_response_hash["message"] })
     end
 
     def test_redirect_if_response_is_302 # rubocop:disable Naming/VariableNumber
@@ -115,9 +92,8 @@ module Comgate
         Comgate::ApiCaller.call(url: url, payload: payload, test_call: true)
       end
 
-      assert srv.result.redirect?
-      assert_equal({ headers: {} }, srv.result.response_hash)
-      assert_equal expected_redirect_to_url, srv.result.redirect_to
+      assert_equal(nil, srv.result[:response_body])
+      assert_equal expected_redirect_to_url, srv.result[:redirect_to]
     end
 
     def test_redirect_if_response_is_200_and_params_includes_redirect
@@ -138,14 +114,12 @@ module Comgate
         Comgate::ApiCaller.call(url: url, payload: payload, test_call: true)
       end
 
-      expected_response_hash = { code: 0,
-                                 message: "OK",
-                                 transId: "AB12-CD34-EF56",
-                                 redirect: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56",
-                                 headers: {} }
-      assert srv.result.redirect?
-      assert_equal expected_response_hash, srv.result.response_hash
-      assert_equal expected_redirect_to_url, srv.result.redirect_to
+      expected_response_hash = { "code" => "0",
+                                 "message" => "OK",
+                                 "transId" => "AB12-CD34-EF56",
+                                 "redirect" => "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56" }
+      assert_equal expected_response_hash, srv.result[:response_body]
+      assert_equal expected_redirect_to_url, srv.result[:redirect_to]
     end
 
     def test_handle_url_encoded_response
@@ -154,17 +128,20 @@ module Comgate
 
     def test_handle_json_response
       expected_result_hash = {
-        methods: [
+        "methods" => [
           {
-            id: "CARD_CZ_CSOB_2",
-            name: "Platební karta"
+            "id" => "CARD_CZ_CSOB_2",
+            "name" => "Platební karta"
           },
           {
-            id: "APPLEPAY_REDIRECT",
-            name: "Apple Pay"
+            "id" => "APPLEPAY_REDIRECT",
+            "name" => "Apple Pay"
           }
         ],
-        nested: { stuff: "here", and_also: "there" }
+        "nested" => {
+          "stuff" => "here",
+          "and_also" => "there"
+        }
       }
 
       api_response = HttpResponseStubStruct.new(code: "200",
@@ -175,7 +152,31 @@ module Comgate
         Comgate::ApiCaller.call(url: FAKE_URL, payload: {}, test_call: true)
       end
 
-      assert_equal expected_result_hash.merge({ headers: {} }), srv.result.response_hash
+      assert_equal expected_result_hash, srv.result[:response_body]
+    end
+
+    def test_handle_json_array_response
+      expected_result_array = [
+        {
+          "id" => "CARD_CZ_CSOB_2",
+          "name" => "Platební karta"
+        },
+        {
+          "id" => "APPLEPAY_REDIRECT",
+          "name" => "Apple Pay"
+        }
+      ]
+
+      api_response = HttpResponseStubStruct.new(code: "200",
+                                                body: expected_result_array.to_json,
+                                                uri: URI.parse(FAKE_URL),
+                                                headers: { "content-type" => "application/json; charset=UTF-8" })
+
+      srv = Net::HTTP.stub(:start, fake_http(api_response)) do
+        Comgate::ApiCaller.call(url: FAKE_URL, payload: {}, test_call: true)
+      end
+
+      expect(srv.result[:response_body]).to eql(expected_result_array)
     end
 
     private

@@ -18,20 +18,13 @@ module Comgate
       Net::ProtocolError
     ].freeze
 
-    attr_reader :payload, :url, :redirect_to
-
-    ResultHash = Struct.new(:http_code, :redirect_to, :response_hash, keyword_init: true) do
-      def redirect?
-        !redirect_to.nil?
-      end
-    end
+    attr_reader :payload, :url
 
     def initialize(url:, payload:, test_call: false)
       super()
       @url = url
       @payload = payload
       @payload.merge!(test: "true") if test_call
-      @redirect_to = nil
     end
 
     def build_result
@@ -54,14 +47,13 @@ module Comgate
 
       api_log(:debug, "Comgate API RESPONSE: #{response} with body:\n#{response.body}")
 
-      set_redirection
-      @result = ResultHash.new(http_code: response.code.to_i,
-                               redirect_to: redirect_to,
-                               response_hash: parsed_response)
+      @result = {
+        http_code: response.code.to_i,
+        redirect_to: find_redirect_to,
+        response_body: decoded_response_body
+      }
 
-      return unless api_error?
-
-      errors[:api] = [api_error_text]
+      record_api_error
     end
 
     def https_conn
@@ -100,17 +92,12 @@ module Comgate
       }
     end
 
-    def set_redirection
-      rcode = response&.code&.to_i
-      @redirect_to = nil
-
-      return unless rcode.positive?
-
-      case rcode
+    def find_redirect_to
+      case response&.code&.to_i
       when 302
-        @redirect_to = response_location
+        response_location
       when 200
-        @redirect_to = parsed_response_body[:redirect]
+        decoded_response_body.is_a?(Hash) ? decoded_response_body["redirect"] : nil
       end
     end
 
@@ -118,42 +105,40 @@ module Comgate
       !redirect_to.nil?
     end
 
-    def api_error?
-      return false if response_redirect?
-      return false if result.response_hash[:code].nil?
+    def record_api_error
+      return unless api_error?
 
-      result.response_hash[:code].positive?
+      errors[:api] = ["[Error ##{result[:response_body]["error"]}] #{result[:response_body]["message"]}"]
+      @result[:errors] = { api: { code: result[:response_body]["error"].to_i,
+                                  message: result[:response_body]["message"] } }
     end
 
-    def api_error_text
-      "[Error ##{result.response_hash[:code]}] #{result.response_hash[:message]}"
+    def api_error?
+      return false unless decoded_response_body.is_a?(Hash)
+
+      decoded_response_body["error"].to_i.positive?
     end
 
     def handle_connection_error(error)
-      @result = ResultHash.new(http_code: 500, response_hash: {})
       errors[:connection] = ["#{error.class} > #{service_uri} - #{error}"]
+
+      @result = {
+        http_code: 500,
+        errors: { connection: [{ code: 500, message: "#{error.class} > #{service_uri} - #{error}" }] }
+      }
     end
 
     def encoded_request_body
       URI.encode_www_form(payload)
     end
 
-    def parsed_response
-      parsed_response_body.merge({ headers: parsed_response_headers })
-    end
-
-    def parsed_response_headers
-      {}
-    end
-
-    def parsed_response_body
-      resp = case response_content_type
-             when :url_encoded
-               URI.decode_www_form(response.body).to_h.deep_symbolize_keys
-             when :json
-               JSON.parse(response.body).to_h.deep_symbolize_keys
-             end
-      Comgate::Response.new(resp).to_h
+    def decoded_response_body
+      @decoded_response_body ||= case response_content_type
+                                 when :url_encoded
+                                   URI.decode_www_form(response.body).to_h
+                                 when :json
+                                   JSON.parse(response.body)
+                                 end
     end
 
     def api_log(level, message)

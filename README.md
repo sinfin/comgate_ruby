@@ -31,16 +31,27 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ## Usecases
 ### Single payment process
-1) Start transaction by `gateway.start_transaction(payment_data)`. Response look like
+1) Start transaction by `gateway.start_transaction(payment_data)`. Response is
+      ```ruby
+        #<Comgate::Response:0x00007f56800295a8
+          @array=nil,
+          @errors=nil,
+          @hash={:code=>0, :message=>"OK", :transaction_id=>"AB12-CD34-EF56", :redirect_to=>"https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56"},
+          @http_code=200,
+          @params_conversion_hash=
+            { .... }
+          @redirect_to="https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56">
+      ```
+   Important part is `response.hash` :
       ```ruby
          {
            code: 0,
            message: "OK",
            transaction_id: "AB12-CD34-EF56"
-           redirect_to: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56"
+           redirect_to: "https://payments.comgate.cz/client/instructions/index?id=AB12-CD34-EF56",
          }
       ```
-2) Redirect user to `redirect_to` page (=> display Comgate form).
+2) Redirect user to `response.redirect_to` page (=> display Comgate form).
 3) Client will (not) pay.
 4) Comgate will send request to your defined endpoint about status change of transaction. Call `gateway.process_state_change(payload)`, which will return
   `{state: :paid, transaction_id: ":transID"}`(and maybe some more informations).
@@ -48,22 +59,22 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Recurring payments
 1) Use `gateway.start_recurring_transaction(payment_data)` and store `transaction_id`.
-2) Create following payments `gateway.repeat_recurring_transaction(transaction_id: ":transID", payment_data: payment_data }})`. No redirection here. Price can change in each payment.
+2) Create following payments `gateway.repeat_recurring_transaction(payment_data: new_payment_data.merge({transaction_id: ":transID"}) }})`. No redirection here. Price can change in each payment.
 3) Handle status change like bullets 4) and 5) in single payment
 
 ### Preauthorized payments
 1) Use `gateway.start_preauthorized_transaction(payment_data)` and store `transaction_id`.
-2a) Confirm payment by `gateway.confirm_preauthorized_transaction(payment_data)` (price cannot exceed preauthorized amount)
+2a) Confirm payment by `gateway.confirm_preauthorized_transaction(payment_data.merge({transaction_id: ":transID"}))` (price cannot exceed preauthorized amount)
 2b) Cancel payment by `gateway.cancel_preauthorized_transaction(transaction_id: ":transID")`
 3) Handle status change like bullets 4) and 5) in single payment
 
 ### Verification payments
-1) Use `gateway.start_verfication_transaction(payment_data)` and store `transaction_id`.
+1) Use `gateway.start_verification_transaction(payment_data)` and store `transaction_id`.
 2) If payment is succesfull, bank will refund payment immediatelly.
 3) Then you can create (repeat) payments like reccuring payments.
 
 ### Refund payment
-1) Call `gateway.refund_transaction(transaction_id: ":transID", payment_data)` (refunded value cannot exceed paid amount)
+1) Call `gateway.refund_transaction(payment_data.merge({transaction_id: ":transID"}))` (refunded value cannot exceed paid amount)
 2) Handle status change like bullets 4) and 5) in single payment
 
 ### Cancel payment
@@ -76,7 +87,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 2) Handle status change like bullet 5) in single payment
 
 ### Get payment methods allowed to merchant
-1) Call `gateway.allowed_payment_methods(params)`. It will return array of allowed payment methods.
+1) Call `gateway.allowed_payment_methods(params)`. It will return array of allowed payment methods in `response.array`.
    ```ruby
     [
       { id: "BANK_CZ_CS_P",
@@ -91,15 +102,16 @@ If bundler is not being used to manage dependencies, install the gem by executin
    ```
 
 ### Get list of transfers for date
-1) Call `gateway.transfers_from(date)`. Array of transfers will be returned.
+1) Call `gateway.transfers_from(date)`. Array of transfers will be returned in `response.array`.
     ```ruby
-    [
-      { transfer_id: 1234567,
-        transfer_date: date,
-        account_counter_party: "0/0000",
-        account_outgoing: "123456789/0000",
-        variable_symbol: "12345678"}
-    ]
+      [
+        { transfer_id: 1234567,
+          transfer_date: date,
+          account_counter_party: "0/0000",
+          account_outgoing: "123456789/0000",
+          variable_symbol: "12345678"}
+      ]
+    ```
 
 ## Parameters
 Structure of parameters is unchanged across most of methods, but you can leave out unused keys. You will get error if You  do not pass required key.
@@ -112,7 +124,7 @@ Maximal mixed version looks like:
     message: "OK", # output
     transfer_id: "1234-abcd-45678", # input/output
     test: true, # input (handle as test call)/ output (created by test call)
-    state: :paid, # output
+    state: :paid, # output (:pending, :paid, :cancelled, :authorized)
     merchant: {
       gateway_id: "some_id_from_comgate", # output (input is set at gateway init)
       target_shop_account: "12345678/1234", # input (change against default)/ output
@@ -143,11 +155,20 @@ Maximal mixed version looks like:
     headers: {} # not actually used now
   }
 ```
+## Response
+ Response returned from `gateway` call is `Comgate::Response` instance.
+ You can check redirection `response.redirect? ? response.redirect_to : nil`.
+ Most of the time, the response shoul be hash-like, stored in `response.hash`. But for lists there will be array in `response.array`.
+ If there are errors from API call , they will be in `response.errors`. But note, that gateway will raise them and not return `Comgate::Response` instance.
+ And you can also check `result.http_code` (which is surprisingly 200 from API errors)
 
 ## Errors
- Connection errors or API error responses are raised as RuntimeError with message like ` "{:api=>[\"[Error #1309] incorrect amount\"]}"`.
- Error Number and text can be found in `lib/comgate/response.rb`.
- This may be refactored in future.
+Connection errors or API error responses are raised as RuntimeError with message like ` "{:api=>[\"[Error #1309] incorrect amount\"]}"`.
+Error Number and text can be found in `lib/comgate/response.rb`.
+This may be refactored in future.
+
+## One more thing
+This gem extends `Hash` with methods `deep_symbolize_keys` and `deep_merge` (if needed).
 
 ## Development
 
