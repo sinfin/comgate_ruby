@@ -28,7 +28,7 @@ module Comgate
                                        prepareOnly: true,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK",
                                         "transId" => "AB12-CD34-EF56",
@@ -62,7 +62,7 @@ module Comgate
                                        prepareOnly: true,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret],
+                                       secret: gateway_options[:client_secret],
                                        account: payment_params[:merchant][:target_shop_account],
                                        applePayPayload: Base64.encode64(payment_params[:payment][:apple_pay_payload]),
                                        country: payment_params[:options][:country_code],
@@ -105,7 +105,7 @@ module Comgate
         "transId" => "AB12-CD34-EF56"
       }
 
-      result = gateway.process_payment_callback(mandatory_params)
+      result = gateway.process_callback(mandatory_params)
 
       expected_result = {
         transaction_id: mandatory_params["transId"],
@@ -134,7 +134,7 @@ module Comgate
         "vs" => "673989665"
       }
 
-      result = gateway.process_payment_callback(mandatory_params.merge(optional_params))
+      result = gateway.process_callback(mandatory_params.merge(optional_params))
 
       optional_expected_result = {
         merchant: { target_shop_account: optional_params["account"] },
@@ -165,7 +165,7 @@ module Comgate
                                        initRecurring: true,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK",
                                         "transId" => "AB12-CD34-EF56",
@@ -201,7 +201,7 @@ module Comgate
                                        initRecurringId: transaction_id,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK",
                                         "transId" => "XB11-CD34-EF56" },
@@ -236,7 +236,7 @@ module Comgate
                                        verification: true,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK",
                                         "transId" => "AB12-CD34-EF56",
@@ -270,7 +270,7 @@ module Comgate
                                        preauth: true,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK",
                                         "transId" => "AB12-CD34-EF56",
@@ -298,7 +298,7 @@ module Comgate
                                call_payload: { merchant: gateway_options[:merchant_gateway_id],
                                                amount: params[:payment][:amount_in_cents],
                                                transId: params[:transaction_id],
-                                               secret: gateway_options[:secret] },
+                                               secret: gateway_options[:client_secret] },
                                response_body: { "code" => "0",
                                                 "message" => "OK" },
                                test_call: false }
@@ -317,7 +317,7 @@ module Comgate
       confirm_expectations = { call_url: "https://payments.comgate.cz/v1.0/cancelPreauth",
                                call_payload: { merchant: gateway_options[:merchant_gateway_id],
                                                transId: transaction_id,
-                                               secret: gateway_options[:secret] },
+                                               secret: gateway_options[:client_secret] },
                                response_body: { "code" => "0",
                                                 "message" => "OK" },
                                test_call: false }
@@ -342,7 +342,7 @@ module Comgate
                                        amount: params[:payment][:amount_in_cents],
                                        merchant: gateway_options[:merchant_gateway_id],
                                        refId: params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK" },
                        test_call: true }
@@ -360,7 +360,7 @@ module Comgate
       expectations = { call_url: "https://payments.comgate.cz/v1.0/cancel",
                        call_payload: { transId: transaction_id,
                                        merchant: gateway_options[:merchant_gateway_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "0",
                                         "message" => "OK" },
                        test_call: false }
@@ -379,7 +379,7 @@ module Comgate
       expectations = { call_url: "https://payments.comgate.cz/v1.0/status",
                        call_payload: { merchant: gateway_options[:merchant_gateway_id],
                                        transId: transaction_id,
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
 
                        response_body: { "code" => "0",
                                         "message" => "OK",
@@ -493,7 +493,7 @@ module Comgate
                         curr: params[:payment][:currency],
                         country: params[:options][:country_code],
                         merchant: gateway_options[:merchant_gateway_id],
-                        secret: gateway_options[:secret] },
+                        secret: gateway_options[:client_secret] },
         response_body: response_body,
         test_call: false
       }
@@ -512,7 +512,7 @@ module Comgate
       expectations = { call_url: "https://payments.comgate.cz/v1.0/transferList",
                        call_payload: { merchant: gateway_options[:merchant_gateway_id],
                                        date: "2023-04-14",
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: [ # from json array
                          {
                            "transferId" => 33_459_010,
@@ -571,7 +571,7 @@ module Comgate
                                        verification: true,
                                        price: payment_params[:payment][:amount_in_cents],
                                        refId: payment_params[:payment][:reference_id],
-                                       secret: gateway_options[:secret] },
+                                       secret: gateway_options[:client_secret] },
                        response_body: { "code" => "1309",
                                         "message" => "Nespravná cena" },
                        errors: { api: ["[Error #1309] Nesprávná cena"] },
@@ -595,7 +595,7 @@ module Comgate
       {
         merchant_gateway_id: "some_id_from_comgate",
         test_calls: true,
-        secret: "Psst!ItIsPrivate!"
+        client_secret: "Psst!ItIsPrivate!"
       }
     end
 

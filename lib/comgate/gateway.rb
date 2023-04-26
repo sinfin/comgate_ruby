@@ -25,6 +25,18 @@ module Comgate
       preauth: %i[payment preauthorization],
       verification: %i[payment verification_payment],
 
+      ## not used for Comgate, but for other Gateway payments they are needed
+      ## so here they are for evidence
+      # firstName: %i[payer first_name],
+      # lastName: %i[payer last_name],
+      # street: %i[payer street_line],
+      # city: %i[payer city],
+      # postalCode: %i[payer postal_code],
+      # payerCountryCode: %i[payer country_code],
+      # description: %i[payment description],
+      # returnUrl: %i[options shop_return_url],
+      # callbackUrl: %i[options callback_url],
+
       # responses
       transId: %i[transaction_id],
       transferId: %i[transfer_id],
@@ -53,9 +65,9 @@ module Comgate
 
     def initialize(options)
       @options = options
-      return unless options[:merchant_gateway_id].nil? || options[:secret].nil? || options[:test_calls].nil?
+      return unless options[:merchant_gateway_id].nil? || options[:client_secret].nil? || options[:test_calls].nil?
 
-      raise ArgumentError "options have to include :merchant_gateway_id, :secret and :test_calls"
+      raise ArgumentError, "options have to include :merchant_gateway_id, :client_secret and :test_calls"
     end
 
     def test_calls_used?
@@ -128,9 +140,10 @@ module Comgate
                 test_call: false)
     end
 
-    def process_payment_callback(comgate_params)
+    def process_callback(comgate_params)
       Comgate::Response.new({ response_body: comgate_params }, DATA_CONVERSION_HASH)
     end
+    alias process_payment_callback process_callback  # backward compatibility
 
     def allowed_payment_methods(payment_data)
       ph = gateway_params.merge(convert_data_to_comgate_params(%i[curr lang country], payment_data, required: false))
@@ -189,7 +202,7 @@ module Comgate
 
     def gateway_params
       { merchant: options[:merchant_gateway_id],
-        secret: options[:secret] }
+        secret: options[:client_secret] }
     end
 
     def convert_data_to_comgate_params(comgate_keys, data, required:)

@@ -18,13 +18,13 @@ If bundler is not being used to manage dependencies, install the gem by executin
 ### 1) set gateway object
   As singleton on app init or for each transaction:
   ```ruby
-    gateway = Commgate::Gateway.new(merchant_gateway_id: ":comgate_id",
-                                    test_calls: false,
-                                    secret: ":comgate_secret")
+    gateway = Comgate::Gateway.new(merchant_gateway_id: ":comgate_id",
+                                   test_calls: false,
+                                   client_secret: ":comgate_secret")
   ```
 
 ### 2) prepare endpoint
- Comgate sends POST requests to your app about transactions updates. The URL of it needs to be setup in Comgate Client portal. At endpoint, just call `gateway.process_payment_callback(params)`, which will return
+ Comgate sends POST requests to your app about transactions updates. The URL of it needs to be setup in Comgate Client portal. At endpoint, just call `gateway.process_callback(params)`, which will return
     `{state: :paid, transaction_id: ":transID"}` (at least). See bullets 4) and 5) in Single payment process bellow.
 ### 3) call appropriate method
  (see bellow)
