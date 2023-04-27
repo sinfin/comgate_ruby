@@ -134,7 +134,7 @@ module Comgate
                 test_call: false)
     end
 
-    def check_state(transaction_id:)
+    def check_transaction(transaction_id:)
       make_call(url: "#{BASE_URL}/status",
                 payload: gateway_params.merge(transId: transaction_id),
                 test_call: false)

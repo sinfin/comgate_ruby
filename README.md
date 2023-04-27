@@ -83,7 +83,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Check payment state (ad-hoc)
 0) The endpoint must be always implemented, this is just additional way to check payment state
-1) Call `gateway.check_state(transaction_id: ":transID")`. It will return `{state: :paid, transaction_id: ":transID"}` and some more infos.
+1) Call `gateway.check_transaction(transaction_id: ":transID")`. It will return `{state: :paid, transaction_id: ":transID"}` and some more infos.
 2) Handle status change like bullet 5) in single payment
 
 ### Get payment methods allowed to merchant

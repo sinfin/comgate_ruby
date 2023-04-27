@@ -31,7 +31,7 @@ module Comgate
       1500 => "unexpected error"
     }.freeze
 
-    attr_accessor :http_code, :redirect_to, :hash, :array, :errors
+    attr_accessor :http_code, :transaction_id, :redirect_to, :hash, :array, :errors
     attr_reader :params_conversion_hash
 
     def initialize(caller_result, params_conversion_hash = {})
@@ -46,6 +46,7 @@ module Comgate
       case converted_body
       when Hash
         @hash = converted_body
+        @transaction_id = converted_body[:transaction_id]
         @array = nil
       when Array
         @array = converted_body

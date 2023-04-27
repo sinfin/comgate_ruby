@@ -115,8 +115,14 @@ module Comgate
 
     def api_error?
       return false unless decoded_response_body.is_a?(Hash)
+      return true if decoded_response_body["error"].to_i.positive?
 
-      decoded_response_body["error"].to_i.positive?
+      if decoded_response_body["code"].to_i.positive?
+        decoded_response_body["error"] = decoded_response_body["code"]
+        return true
+      end
+
+      false
     end
 
     def handle_connection_error(error)

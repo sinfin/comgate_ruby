@@ -72,6 +72,28 @@ module Comgate
       expect(service.result[:errors][:api]).to include({ code: 1400, message: expected_response_hash["message"] })
     end
 
+    def test_can_handle_api_errors_without_error_attribute # rubocop:disable Metrics/AbcSize
+      payload = { merchant: 123_456,
+                  transId: "AB12-CD34-EF56",
+                  secret: "x4q8OV3TJt6noJnfhjqJKyX3Z6Ych0y" }
+      url = "#{FAKE_URL}/status"
+
+      err_message = "Unauthorized access"
+      service = call_returning_api_error({ code: 1400, message: err_message },
+                                         { url: url, payload: payload })
+
+      expected_response_hash = { "error" => "1400",
+                                 "code" => "1400",
+                                 "message" => err_message }
+
+      expect(service).to be_failure, "Service should fail for non 0 code"
+      expect(service.result[:http_code]).to eql(200), "result.http_code should be 200"
+      expect(service.result[:response_body]).to eql(expected_response_hash),
+                                                "result.response should be '#{expected_response_hash}'"
+      expect(service.errors[:api]).to include("[Error #1400] #{expected_response_hash["message"]}")
+      expect(service.result[:errors][:api]).to include({ code: 1400, message: expected_response_hash["message"] })
+    end
+
     def test_redirect_if_response_is_302 # rubocop:disable Naming/VariableNumber
       redirect_path = "/redirect/here/please"
 

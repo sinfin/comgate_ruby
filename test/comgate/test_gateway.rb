@@ -404,7 +404,7 @@ module Comgate
                        test_call: false }
 
       result = expect_successful_api_call_with(expectations) do
-        gateway.check_state(transaction_id: transaction_id)
+        gateway.check_transaction(transaction_id: transaction_id)
       end
 
       expected_gateway_response_hash = {
