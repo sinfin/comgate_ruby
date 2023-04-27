@@ -3,7 +3,7 @@
 - Initial release
 
 
-## [0.7.0] - 2023-04-27
+## [0.7.1] - 2023-04-27
 
 - better handling errors not in "error" param from Comgate
 - renamed  `check_state` to `check_transaction` (and keep backward compatibility)

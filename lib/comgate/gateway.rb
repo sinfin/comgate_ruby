@@ -139,6 +139,7 @@ module Comgate
                 payload: gateway_params.merge(transId: transaction_id),
                 test_call: false)
     end
+    alias check_state check_transaction  # backward compatibility
 
     def process_callback(comgate_params)
       Comgate::Response.new({ response_body: comgate_params }, DATA_CONVERSION_HASH)
