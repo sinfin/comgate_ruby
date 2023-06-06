@@ -87,9 +87,9 @@ module Comgate
     end
 
     def repeat_recurring_transaction(payment_data)
-      transaction_id = payment_data.delete(:transaction_id)
+      init_transaction_id = payment_data[:payment][:recurrence].delete(:init_transaction_id)
       make_call(url: "#{BASE_URL}/recurring",
-                payload: single_payment_payload(payment_data).merge(initRecurringId: transaction_id),
+                payload: single_payment_payload(payment_data).merge(initRecurringId: init_transaction_id),
                 test_call: test_call?(payment_data[:test]))
     end
 
@@ -139,7 +139,7 @@ module Comgate
                 payload: gateway_params.merge(transId: transaction_id),
                 test_call: false)
     end
-    alias check_state check_transaction  # backward compatibility
+    alias check_state check_transaction # backward compatibility
 
     def process_callback(comgate_params)
       Comgate::Response.new({ response_body: comgate_params }, DATA_CONVERSION_HASH)

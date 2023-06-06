@@ -59,7 +59,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ### Recurring payments
 1) Use `gateway.start_recurring_transaction(payment_data)` and store `transaction_id`.
-2) Create following payments `gateway.repeat_recurring_transaction(payment_data: new_payment_data.merge({transaction_id: ":transID"}) }})`. No redirection here. Price can change in each payment.
+2) Create following payments `gateway.repeat_recurring_transaction(payment_data: new_payment_data)`, where `new_payment_data` includes `{payment: {reccurrence: { init_transaction_id: transaction_id } } }`. No redirection here. Price can change in each payment.
 3) Handle status change like bullets 4) and 5) in single payment
 
 ### Preauthorized payments
@@ -141,20 +141,34 @@ Maximal mixed version looks like:
         apple_pay_payload: "raw apple pay payload", # input
         dynamic_expiration: false, # input (see  https://help.comgate.cz/v1/docs/expirace-plateb )
         expiration_time: "10h", # input ( use "m" or  "h" or "d", but only one of them; allowed rage "30m".."7d")
+        description: "Some description",
+        reccurrence: { init_transaction_id: "12AD-dfsA-4568",
+                       period: 1 } },
     },
     payer: {
         email: "payer1@gmail.com", # input/output
         phone: "+420778899", # input/output
+        first_name: "John", # input - not used at Comgate
+        last_name: "Doe", # input - not used at Comgate
         account_number: "account_num", # output
         account_name: "payer account name" # output
     },
     options: {
       country_code: "DE", # input (can restrict allowed  payment methods)
-      language_code: "sk" # input
+      language_code: "sk", # input
+      shop_return_url: "https://example.com/return",
+      callback_url: "https://example.com/callback"
     },
+    # items are not used at Comgate
+    items: [{ type: "ITEM",
+              name: "Je to kulatý – Měsíční (6. 6. 2023 – 6. 7. 2023)",
+              amount_in_cents: 9900,
+              count: 1,
+              vat_rate_percent: 21 }],
     headers: {} # not actually used now
   }
 ```
+
 ## Response
  Response returned from `gateway` call is `Comgate::Response` instance.
  You can check redirection `response.redirect? ? response.redirect_to : nil`.

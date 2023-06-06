@@ -189,7 +189,7 @@ module Comgate
       # next payment is on background
       new_payment_params = payment_params
       new_payment_params[:payment][:amount_in_cents] = 4_200
-      new_payment_params[:transaction_id] = transaction_id
+      new_payment_params[:payment].merge!({ recurrence: { init_transaction_id: transaction_id } })
 
       expectations = { call_url: "https://payments.comgate.cz/v1.0/recurring",
                        call_payload: { curr: payment_params[:payment][:currency],
@@ -612,20 +612,31 @@ module Comgate
 
     def maximal_payment_params
       minimal_payment_params.deep_merge({
-                                          payer: { phone: "+420777888999" },
+                                          payer: { phone: "+420777888999", email: "some@email.cz", first_name: "John",
+                                                   last_name: "Doe" },
                                           merchant: { target_shop_account: "12345678/1234" }, # gateway variable
                                           payment: { apple_pay_payload: "apple pay payload",
                                                      dynamic_expiration: false,
                                                      expiration_time: "10h",
                                                      # init_reccuring_payments: true,
-                                                     product_name: "Usefull things" },
+                                                     description: "Some description",
+                                                     product_name: "Usefull things",
+                                                     reccurrence: { init_transaction_id: "12AD-dfsA-4568",
+                                                                    period: 1 } },
                                           # preauthorization: false,
                                           # verification_payment: true,
                                           options: {
                                             country_code: "DE",
                                             # embedded_iframe: false, # redirection after payment  # gateway variable
-                                            language_code: "sk"
+                                            language_code: "sk",
+                                            shop_return_url: "https://example.com/return",
+                                            callback_url: "https://example.com/callback"
                                           },
+                                          items: [{ type: "ITEM",
+                                                    name: "Je to kulatý – Měsíční (6. 6. 2023 – 6. 7. 2023)",
+                                                    amount_in_cents: 9900,
+                                                    count: 1,
+                                                    vat_rate_percent: 21 }],
                                           test: true
                                         })
     end
