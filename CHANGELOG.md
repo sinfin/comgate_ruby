@@ -1,3 +1,6 @@
+## [0.8.1] - 2023-06-13
+- Allowed  `proxy_uri` param for Comgate::Gateway
+
 ## [0.8] - 2023-06-06
 - Update to conform universal payment interface params (see Readme)
 - BREAKING: change in repeating params `{transaction_id: "xxx", ....}` is now at `{payment: {reccurrence: { init_transaction_id: "xxx" } } }`

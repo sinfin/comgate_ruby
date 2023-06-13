@@ -13,6 +13,45 @@ module Comgate
 
       assert_equal gateway_options[:merchant_gateway_id], gateway.options[:merchant_gateway_id]
       assert gateway.test_calls_used?
+      assert_nil gateway.proxy_uri
+    end
+
+    def test_uses_proxy_if_set # rubocop:disable Metrics/AbcSize
+      proxy_uri = "http://proxy.com"
+      gateway = Comgate::Gateway.new(gateway_options.merge(proxy_uri: proxy_uri))
+
+      assert_equal gateway_options[:merchant_gateway_id], gateway.options[:merchant_gateway_id]
+      assert gateway.test_calls_used?
+      assert_equal proxy_uri, gateway.proxy_uri
+
+      payment_params = minimal_payment_params
+      call_payload = { curr: payment_params[:payment][:currency],
+                       email: payment_params[:payer][:email],
+                       label: payment_params[:payment][:label],
+                       merchant: gateway_options[:merchant_gateway_id],
+                       method: payment_params[:payment][:method],
+                       prepareOnly: true,
+                       price: payment_params[:payment][:amount_in_cents],
+                       refId: payment_params[:payment][:reference_id],
+                       secret: gateway_options[:client_secret] }
+
+      api_result = { http_code: 200,
+                     redirect_to: "https://payments.comgate.cz/client/redirect",
+                     response_body: { "code" => "0",
+                                      "message" => "OK",
+                                      "transId" => "AB12-CD34-EF56",
+                                      "redirect" => "https://payments.comgate.cz/client/redirect" } }
+
+      expect_method_called_on(object: Comgate::ApiCaller,
+                              method: :call,
+                              args: [],
+                              kwargs: { url: "https://payments.comgate.cz/v1.0/create",
+                                        payload: call_payload,
+                                        test_call: true,
+                                        proxy_uri: proxy_uri },
+                              return_value: service_stub(true, api_result, {})) do
+        gateway.start_transaction(payment_params)
+      end
     end
 
     def test_create_single_payment_with_minimal_data # rubocop:disable Metrics/AbcSize
@@ -652,7 +691,8 @@ module Comgate
                                        args: [],
                                        kwargs: { url: expectations[:call_url],
                                                  payload: expectations[:call_payload],
-                                                 test_call: expectations[:test_call] },
+                                                 test_call: expectations[:test_call],
+                                                 proxy_uri: nil },
                                        return_value: service_stub(true, api_result, {}),
                                        &block)
 
@@ -670,7 +710,8 @@ module Comgate
                                 args: [],
                                 kwargs: { url: expectations[:call_url],
                                           payload: expectations[:call_payload],
-                                          test_call: expectations[:test_call] },
+                                          test_call: expectations[:test_call],
+                                          proxy_uri: nil },
                                 return_value: service_stub(false, api_result, expectations[:errors]),
                                       &block)
       end

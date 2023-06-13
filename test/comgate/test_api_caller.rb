@@ -6,6 +6,8 @@ require "net/http"
 # rubocop:disable Layout/LineLength
 module Comgate
   class TestApiCaller < Minitest::Test
+    include MethodInvokingMatchersHelper
+
     FAKE_URL = "http://test.me"
     HttpResponseStubStruct = Struct.new(:code, :body, :uri, :headers, keyword_init: true) do
       def [](key)
@@ -199,6 +201,44 @@ module Comgate
       end
 
       expect(srv.result[:response_body]).to eql(expected_result_array)
+    end
+
+    def test_uses_proxy_if_set_in_initialize
+      proxy_url = "proxy.me"
+      proxy_port = 8080
+      proxy_user = "user"
+      proxy_pass = "pass"
+      proxy_uri = "http://#{proxy_user}:#{proxy_pass}@#{proxy_url}:#{proxy_port}"
+
+      payload = { my_payload: "here" }
+      url = "#{FAKE_URL}/create"
+      service_uri = URI.parse(url)
+
+      matching_request = { method: "POST",
+                           path: "/create",
+                           body: URI.encode_www_form(payload.merge({ test: "true" })) }
+
+      expected_connection_args = [service_uri.host,
+                                  service_uri.port,
+                                  proxy_url,
+                                  proxy_port,
+                                  proxy_user,
+                                  proxy_pass,
+                                  { use_ssl: true, verify_mode: 1, keep_alive_timeout: 30 }]
+      conn_mock = fake_http(HttpResponseStubStruct.new(code: "200",
+                                                       body: "code=0&message=OK+%28may+be?%29",
+                                                       uri: URI.parse(FAKE_URL),
+                                                       headers: { "content-type" => "application/x-www-form-urlencoded; charset=UTF-8" }),
+                            matching_request)
+      conn_mock.expect(:==, false, [:not_passed])
+
+      expect_method_called_on(object: Net::HTTP,
+                              method: :start,
+                              args: expected_connection_args,
+                              kwargs: {},
+                              return_value: conn_mock) do
+        Comgate::ApiCaller.call(url: url, payload: payload, test_call: true, proxy_uri: proxy_uri)
+      end
     end
 
     private

@@ -20,11 +20,12 @@ module Comgate
 
     attr_reader :payload, :url
 
-    def initialize(url:, payload:, test_call: false)
+    def initialize(url:, payload:, test_call: false, proxy_uri: nil)
       super()
       @url = url
       @payload = payload
       @payload.merge!(test: "true") if test_call
+      @proxy_uri = proxy_uri
     end
 
     def build_result
@@ -57,7 +58,20 @@ module Comgate
     end
 
     def https_conn
-      @https_conn ||= Net::HTTP.start(service_uri.host, service_uri.port, connection_options)
+      @https_conn ||= if @proxy_uri
+                        proxy = URI.parse(@proxy_uri)
+                        Net::HTTP.start(service_uri.host,
+                                        service_uri.port,
+                                        proxy.host,
+                                        proxy.port,
+                                        proxy.user,
+                                        proxy.password,
+                                        connection_options)
+                      else
+                        Net::HTTP.start(service_uri.host,
+                                        service_uri.port,
+                                        connection_options)
+                      end
     end
 
     def request

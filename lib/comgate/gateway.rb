@@ -74,6 +74,10 @@ module Comgate
       options[:test_calls] == true
     end
 
+    def proxy_uri
+      options[:proxy_uri]
+    end
+
     def start_transaction(payment_data)
       make_call(url: "#{BASE_URL}/create",
                 payload: single_payment_payload(payment_data),
@@ -173,7 +177,7 @@ module Comgate
     def make_call(url:, payload:, test_call:, conversion_hash: DATA_CONVERSION_HASH)
       raise "There are errors in pre-api-call phase: #{payload[:errors]}" unless payload[:errors].nil?
 
-      srv = Comgate::ApiCaller.call(url: url, payload: payload, test_call: test_call)
+      srv = Comgate::ApiCaller.call(url: url, payload: payload, test_call: test_call, proxy_uri: proxy_uri)
       if srv.success?
         Comgate::Response.new(srv.result, conversion_hash)
       else

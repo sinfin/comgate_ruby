@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    comgate_ruby (0.8.0)
+    comgate_ruby (0.8.1)
 
 GEM
   remote: https://rubygems.org/

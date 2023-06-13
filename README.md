@@ -21,6 +21,11 @@ If bundler is not being used to manage dependencies, install the gem by executin
     gateway = Comgate::Gateway.new(merchant_gateway_id: ":comgate_id",
                                    test_calls: false,
                                    client_secret: ":comgate_secret")
+    # or with proxy
+    gateway = Comgate::Gateway.new(merchant_gateway_id: ":comgate_id",
+                                test_calls: false,
+                                client_secret: ":comgate_secret",
+                                proxy_uri: "http://pxuser:pxpassword@proxy.me:123") # or just "http://proxy.me:123"
   ```
 
 ### 2) prepare endpoint
