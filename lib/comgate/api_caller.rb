@@ -167,11 +167,13 @@ module Comgate
       else
         puts("#{Time.now} [#{forced_log_level(level)}] #{message}")
       end
+    rescue StandardError => e
+      puts("#{Time.now} [#{forced_log_level(level)}] #{message} - #{e}")
     end
 
     def forced_log_level(original_level)
       levels = { debug: 0, info: 1, error: 2 }
-      minimal_level = :error
+      minimal_level = ENV["COMGATE_MIN_LOG_LEVEL"]&.to_sym || :debug
       levels[original_level] > levels[minimal_level] ? original_level : minimal_level
     end
 

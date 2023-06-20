@@ -1,3 +1,6 @@
+## [0.8.2] - 2023-06-20
+- If ENV["COMGATE_MIN_LOG_LEVEL"] is set, calls and responses to Comgate are logged at that level. Otherwise `:debug` is used.
+
 ## [0.8.1] - 2023-06-13
 - Allowed  `proxy_uri` param for Comgate::Gateway
 

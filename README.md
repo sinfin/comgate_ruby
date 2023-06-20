@@ -148,7 +148,9 @@ Maximal mixed version looks like:
         expiration_time: "10h", # input ( use "m" or  "h" or "d", but only one of them; allowed rage "30m".."7d")
         description: "Some description",
         reccurrence: { init_transaction_id: "12AD-dfsA-4568",
-                       period: 1 } },
+                       period: 1,
+                       cycle: :month, # :on_demand
+                       valid_to: } },
     },
     payer: {
         email: "payer1@gmail.com", # input/output
@@ -188,6 +190,8 @@ This may be refactored in future.
 
 ## One more thing
 This gem extends `Hash` with methods `deep_symbolize_keys` and `deep_merge` (if needed).
+
+Every request to Comgate is logged/printout at `:debug` level. You can change the minimal level with ENV variable "COMGATE_MIN_LOG_LEVEL".
 
 ## Development
 
