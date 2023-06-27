@@ -179,10 +179,11 @@ module Comgate
       raise "There are errors in pre-api-call phase: #{payload[:errors]}" unless payload[:errors].nil?
 
       srv = Comgate::ApiCaller.call(url: url, payload: payload, test_call: test_call, proxy_uri: proxy_uri)
+
       if srv.success?
         Comgate::Response.new(srv.result, conversion_hash)
       else
-        handle_failure_from(srv)
+        handle_failure_from(srv, conversion_hash)
       end
     end
 
@@ -190,8 +191,8 @@ module Comgate
       test_from_data.nil? ? test_calls_used? : (test_from_data == true)
     end
 
-    def handle_failure_from(srv)
-      raise srv.errors.to_s unless srv.result.dig(:response_body, "transId").present?
+    def handle_failure_from(srv, conversion_hash)
+      raise srv.errors.to_s if srv.result.dig(:response_body, "transId").nil?
 
       # pretends to be a successfull response, and keep payment check to decide what to do next
       Comgate::Response.new(srv.result, conversion_hash)

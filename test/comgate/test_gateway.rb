@@ -616,8 +616,10 @@ module Comgate
                        errors: { api: ["[Error #1309] Nesprávná cena"] },
                        test_call: true }
 
-      exception = expect_failed_api_call_with(expectations) do
-        gateway.start_verification_transaction(payment_params)
+      exception = assert_raises do
+        expect_failed_api_call_with(expectations) do
+          gateway.start_verification_transaction(payment_params)
+        end
       end
 
       assert_equal expectations[:errors].to_s, exception.message
@@ -646,7 +648,7 @@ module Comgate
                        errors: { api: ["[Error #1500]  Unexpected result of recurrent payment creation"] },
                        test_call: true }
 
-      result = expect_successful_api_call_with(expectations) do
+      result = expect_failed_api_call_with(expectations) do
         gateway.start_verification_transaction(payment_params)
       end
 
@@ -735,21 +737,38 @@ module Comgate
       result
     end
 
+    def expect_successful_but_errorful_api_call_with(expectations, &block)
+      api_result = { http_code: 200,
+                     response_body: expectations[:response_body] }
+
+      result = expect_method_called_on(object: Comgate::ApiCaller,
+                                       method: :call,
+                                       args: [],
+                                       kwargs: { url: expectations[:call_url],
+                                                 payload: expectations[:call_payload],
+                                                 test_call: expectations[:test_call],
+                                                 proxy_uri: nil },
+                                       return_value: service_stub(true, api_result, expectations[:errors]),
+                                       &block)
+
+      assert_equal 200, result.http_code
+      result
+    end
+
     def expect_failed_api_call_with(expectations, &block)
       api_result = { http_code: 200,
                      response_body: expectations[:response_body] }
 
-      assert_raises do
-        expect_method_called_on(object: Comgate::ApiCaller,
-                                method: :call,
-                                args: [],
-                                kwargs: { url: expectations[:call_url],
-                                          payload: expectations[:call_payload],
-                                          test_call: expectations[:test_call],
-                                          proxy_uri: nil },
-                                return_value: service_stub(false, api_result, expectations[:errors]),
-                                      &block)
-      end
+
+      expect_method_called_on(object: Comgate::ApiCaller,
+                              method: :call,
+                              args: [],
+                              kwargs: { url: expectations[:call_url],
+                                        payload: expectations[:call_payload],
+                                        test_call: expectations[:test_call],
+                                        proxy_uri: nil },
+                              return_value: service_stub(false, api_result, expectations[:errors]),
+                                    &block)
     end
 
     ServiceStubStruct = Struct.new(:success?, :errors, :result, keyword_init: true) do
