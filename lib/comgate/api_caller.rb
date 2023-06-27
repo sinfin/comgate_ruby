@@ -122,9 +122,10 @@ module Comgate
     def record_api_error
       return unless api_error?
 
-      errors[:api] = ["[Error ##{result[:response_body]["error"]}] #{result[:response_body]["message"]}"]
+      msg = [result[:response_body]["message"], result[:response_body]["extraMessage"]].compact.join(" ")
+      errors[:api] = ["[Error ##{result[:response_body]["error"]}] #{msg}"]
       @result[:errors] = { api: { code: result[:response_body]["error"].to_i,
-                                  message: result[:response_body]["message"] } }
+                                  message: msg } }
     end
 
     def api_error?

@@ -624,6 +624,41 @@ module Comgate
       assert_equal RuntimeError, exception.class
     end
 
+    def test_for_some_api_returned_errors_pretend_that_everything_is_ok # rubocop:disable Metrics/AbcSize
+      # and keep payment check to decide
+      payment_params = minimal_payment_params
+
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/create",
+                       call_payload: { curr: payment_params[:payment][:currency],
+                                       email: payment_params[:payer][:email],
+                                       label: payment_params[:payment][:label],
+                                       merchant: gateway_options[:merchant_gateway_id],
+                                       method: payment_params[:payment][:method],
+                                       prepareOnly: true,
+                                       verification: true,
+                                       price: payment_params[:payment][:amount_in_cents],
+                                       refId: payment_params[:payment][:reference_id],
+                                       secret: gateway_options[:client_secret] },
+                       response_body: { "code" => "1500",
+                                        "message" => "Unexpected error #10",
+                                        "transId" => "LKCN-KLYF-SJMK",
+                                        "extraMessage" => "Unexpected result of recurrent payment creation" },
+                       errors: { api: ["[Error #1500]  Unexpected result of recurrent payment creation"] },
+                       test_call: true }
+
+      result = expect_successful_api_call_with(expectations) do
+        gateway.start_verification_transaction(payment_params)
+      end
+
+      expected_result_hash = { code: 1500,
+                               message: "Unexpected error #10",
+                               extra_message: "Unexpected result of recurrent payment creation",
+                               transaction_id: "LKCN-KLYF-SJMK" }
+      assert_equal expected_result_hash, result.hash
+      assert !result.redirect?
+      assert_nil result.redirect_to
+    end
+
     private
 
     def gateway

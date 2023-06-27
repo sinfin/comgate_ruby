@@ -42,6 +42,7 @@ module Comgate
       transferId: %i[transfer_id],
       code: %i[code],
       message: %i[message],
+      extraMessage: %i[extra_message],
       payerId: %i[payer id],
       payerName: %i[payer account_name],
       payer_name: %i[payer account_name],
@@ -148,7 +149,7 @@ module Comgate
     def process_callback(comgate_params)
       Comgate::Response.new({ response_body: comgate_params }, DATA_CONVERSION_HASH)
     end
-    alias process_payment_callback process_callback  # backward compatibility
+    alias process_payment_callback process_callback # backward compatibility
 
     def allowed_payment_methods(payment_data)
       ph = gateway_params.merge(convert_data_to_comgate_params(%i[curr lang country], payment_data, required: false))
@@ -181,7 +182,7 @@ module Comgate
       if srv.success?
         Comgate::Response.new(srv.result, conversion_hash)
       else
-        handle_failure_from(srv.errors)
+        handle_failure_from(srv)
       end
     end
 
@@ -189,8 +190,11 @@ module Comgate
       test_from_data.nil? ? test_calls_used? : (test_from_data == true)
     end
 
-    def handle_failure_from(errors)
-      raise errors.to_s
+    def handle_failure_from(srv)
+      raise srv.errors.to_s unless srv.result.dig(:response_body, "transId").present?
+
+      # pretends to be a successfull response, and keep payment check to decide what to do next
+      Comgate::Response.new(srv.result, conversion_hash)
     end
 
     def single_payment_payload(payment_data)
