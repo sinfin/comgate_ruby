@@ -37,8 +37,20 @@ module Comgate
 
     attr_accessor :response
 
+    HttpResponseStubStruct = Struct.new(:code, :body, :uri, :headers, keyword_init: true) do
+      def [](key)
+        headers[key]
+      end
+    end
+
     def call_api
       self.response = https_conn.request(request)
+      # body =""
+      # binding.pry
+      # self.response = HttpResponseStubStruct.new(code: "200",
+      #   body: body,
+      #   uri: URI.parse("example.com"),
+      #   headers: { "content-type" => "application/x-www-form-urlencoded; charset=UTF-8" })
     rescue *KNOWN_CONNECTION_ERRORS => e
       handle_connection_error(e)
     end
@@ -124,8 +136,10 @@ module Comgate
 
       msg = [result[:response_body]["message"], result[:response_body]["extraMessage"]].compact.join(" ")
       errors[:api] = ["[Error ##{result[:response_body]["error"]}] #{msg}"]
-      @result[:errors] = { api: { code: result[:response_body]["error"].to_i,
-                                  message: msg } }
+      @result[:errors] = { api: [
+        { code: result[:response_body]["error"].to_i,
+          message: msg }
+      ] }
     end
 
     def api_error?

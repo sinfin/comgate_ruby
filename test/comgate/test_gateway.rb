@@ -759,7 +759,6 @@ module Comgate
       api_result = { http_code: 200,
                      response_body: expectations[:response_body] }
 
-
       expect_method_called_on(object: Comgate::ApiCaller,
                               method: :call,
                               args: [],
