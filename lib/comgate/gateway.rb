@@ -171,6 +171,22 @@ module Comgate
                 test_call: false)
     end
 
+    def download_zipped_csvs_of_transfers(date:, output_file_path:)
+      date_str = date.strftime("%Y-%m-%d")
+
+      resp = make_call(url: "#{BASE_URL}/csvDownload",
+                       payload: gateway_params.merge({ date: date_str }),
+                       test_call: false)
+
+      tmp_file = resp.hash[:file]
+      File.write(output_file_path, tmp_file.read)
+      tmp_file.close
+      tmp_file.unlink
+
+      resp.hash = { file_path: output_file_path }
+      resp
+    end
+
     private
 
     attr_reader :payment_data

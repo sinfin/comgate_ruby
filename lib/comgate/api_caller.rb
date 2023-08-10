@@ -123,6 +123,8 @@ module Comgate
       when 302
         response_location
       when 200
+        return nil if response_content_type == :zip
+
         decoded_response_body.is_a?(Hash) ? decoded_response_body["redirect"] : nil
       end
     end
@@ -173,6 +175,8 @@ module Comgate
                                    URI.decode_www_form(response.body).to_h
                                  when :json
                                    JSON.parse(response.body)
+                                 when :zip
+                                   { file: store_as_tmp_file(response.body, "zipfile.zip") }
                                  end
     end
 
@@ -209,9 +213,19 @@ module Comgate
         :json
       elsif rct.include?("form-urlencoded")
         :url_encoded
+      elsif rct.include?("zip")
+        :zip
       else
         raise "Uncaptured content type: '#{rct}'"
       end
+    end
+
+    def store_as_tmp_file(body, filename = "comgate")
+      file = Tempfile.new(filename)
+      file.binmode
+      file.write(body)
+      file.rewind
+      file
     end
   end
 end

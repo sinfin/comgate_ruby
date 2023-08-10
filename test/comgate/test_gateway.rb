@@ -597,6 +597,41 @@ module Comgate
       assert_equal expected_gateway_response_array, result.array
     end
 
+    def test_get_zipped_csv_transfers_lists # rubocop:disable Metrics/AbcSize
+      time_as_date = Time.new(2023, 4, 14)
+      path_to_download = "csvs_test_file.zip"
+      FileUtils.rm_f(path_to_download)
+
+      api_caller_temporary_file = Tempfile.new("downloaded")
+      api_caller_temporary_file.binmode
+      api_caller_temporary_file.write(File.read(File.expand_path("./test/fixtures/csvs.zip")))
+      api_caller_temporary_file.rewind
+      tmp_file_size = api_caller_temporary_file.size
+
+      expectations = { call_url: "https://payments.comgate.cz/v1.0/csvDownload",
+                       call_payload: { merchant: gateway_options[:merchant_gateway_id],
+                                       date: "2023-04-14",
+                                       secret: gateway_options[:client_secret] },
+                       response_body: { file: api_caller_temporary_file },
+                       test_call: false }
+
+      result = expect_successful_api_call_with(expectations) do
+        gateway.download_zipped_csvs_of_transfers(date: time_as_date, output_file_path: path_to_download)
+      end
+
+      assert !result.redirect?
+      assert_nil result.redirect_to
+      assert_equal({ file_path: path_to_download }, result.hash)
+
+      assert File.exist?(path_to_download), "File #{path_to_download} does not exist after download!"
+      downloaded_file = File.open(path_to_download)
+      assert downloaded_file.is_a?(File)
+      assert_equal tmp_file_size, downloaded_file.size
+      assert !downloaded_file.size.zero? # rubocop:disable Style/ZeroLengthPredicate
+
+      FileUtils.rm_f(path_to_download)
+    end
+
     def test_raises_api_caller_errors # rubocop:disable Metrics/AbcSize
       payment_params = minimal_payment_params
 

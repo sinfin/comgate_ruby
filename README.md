@@ -117,6 +117,10 @@ If bundler is not being used to manage dependencies, install the gem by executin
           variable_symbol: "12345678"}
       ]
     ```
+### Get zip file containing CSV files with transfers of day (much richer data then previous)
+1) Call `gateway.download_zipped_csvs_of_transfers(date: time_as_date, output_file_path: path_to_download)`.
+2) Unzip (at your own) file at `:path_to_download`. There can be several CSV files.
+   Example file can be found at `./test/fixtures/csvs.zip`.
 
 ## Parameters
 Structure of parameters is unchanged across most of methods, but you can leave out unused keys. You will get error if You  do not pass required key.

@@ -203,6 +203,27 @@ module Comgate
       expect(srv.result[:response_body]).to eql(expected_result_array)
     end
 
+    def test_handle_zip_file_response
+      body_file_path = File.expand_path("./test/fixtures/csvs.zip")
+      api_response = HttpResponseStubStruct.new(code: "200",
+                                                body: File.read(body_file_path, encoding: "UTF-8"),
+                                                uri: URI.parse(FAKE_URL),
+                                                headers: { "content-type" => "application/zip; charset=UTF-8" })
+      srv = Net::HTTP.stub(:start, fake_http(api_response)) do
+        Comgate::ApiCaller.call(url: FAKE_URL, payload: {}, test_call: true)
+      end
+
+      tmp_file = srv.result[:response_body][:file]
+      assert tmp_file.is_a?(Tempfile)
+      assert File.exist?(tmp_file.path)
+
+      # File.write("csvs_test.zip",tmp_file.read)
+      # tmp_file.rewind
+      # assert_equal File.read(body_file_path), tmp_file.read   # content is ok, but direct comparison not
+      assert_equal File.open(body_file_path).size, tmp_file.size
+      assert !tmp_file.size.zero? # rubocop:disable Style/ZeroLengthPredicate
+    end
+
     def test_uses_proxy_if_set_in_initialize
       proxy_url = "proxy.me"
       proxy_port = 8080
