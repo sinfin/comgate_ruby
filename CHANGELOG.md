@@ -1,4 +1,4 @@
-## [0.8.3.5] - 2023-08-10
+## [0.8.3.6] - 2023-08-10
 - added `gateway.download_zipped_csvs_of_transfers(date: time_as_date, output_file_path: path_to_download)` (to get transfer fees :-) )
 
 ## [0.8.3.1] - 2023-06-28

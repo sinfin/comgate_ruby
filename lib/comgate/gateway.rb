@@ -179,7 +179,7 @@ module Comgate
                        test_call: false)
 
       tmp_file = resp.hash[:file]
-      File.write(output_file_path, tmp_file.read)
+      File.binwrite(output_file_path, tmp_file.read)
       tmp_file.close
       tmp_file.unlink
 
