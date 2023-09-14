@@ -99,7 +99,7 @@ module Comgate
     def test_redirect_if_response_is_302 # rubocop:disable Naming/VariableNumber
       redirect_path = "/redirect/here/please"
 
-      payload = { my_payload: "here" }
+      payload = { my_payload: "here" , secret: "BIGSECRET"}
       url = "#{FAKE_URL}/create"
       expected_redirect_to_url = "#{FAKE_URL}#{redirect_path}"
 
@@ -165,7 +165,8 @@ module Comgate
         "nested" => {
           "stuff" => "here",
           "and_also" => "there"
-        }
+        },
+        "secret" => "BIGSECRET"
       }
 
       api_response = HttpResponseStubStruct.new(code: "200",

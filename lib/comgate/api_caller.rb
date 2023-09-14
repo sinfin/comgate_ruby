@@ -58,7 +58,7 @@ module Comgate
     def process_response
       return unless errors.empty?
 
-      api_log(:debug, "Comgate API RESPONSE: #{response} with body:\n#{response.body}")
+      api_log(:debug, "Comgate API RESPONSE: #{response} with body:\n#{secured_to_log_body}")
 
       @result = {
         http_code: response.code.to_i,
@@ -91,7 +91,7 @@ module Comgate
       request.body = encoded_request_body
 
       debug_msg = "Commgate API REQUEST: #{request} to #{service_uri} " \
-                  "with headers: #{headers}\n and body:\n#{request.body}"
+                  "with headers: #{headers}\n and body:\n#{payload.except(:secret)}"
       api_log(:debug, debug_msg)
 
       request
@@ -167,6 +167,31 @@ module Comgate
 
     def encoded_request_body
       URI.encode_www_form(payload)
+    end
+
+    def secured_to_log_body
+      return nil if decoded_response_body.nil?
+
+      body_array = if decoded_response_body.respond_to?(:keys)
+        [decoded_response_body.dup]
+      else
+        decoded_response_body.dup
+      end
+
+      s_body_array = body_array.collect do |body|
+        body = body.deep_symbolize_keys
+        body[:secret]  = body[:secret].to_s.gsub(/(.).*(.)/, "$1...$2") if body[:secret].present?
+        if body[:message].present?
+          msg_parts = body[:message].to_s.split(",")
+          body[:message] = msg_parts.select { |p| !p.include?("secret") }.join(",")
+        end
+      end
+
+      if decoded_response_body.respond_to?(:keys)
+        s_body_array.first
+      else
+        s_body_array
+      end
     end
 
     def decoded_response_body

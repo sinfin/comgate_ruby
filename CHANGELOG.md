@@ -1,3 +1,6 @@
+## [0.8.3.7] - 2023-09-14
+- removed `secret` from logs
+
 ## [0.8.3.6] - 2023-08-10
 - added `gateway.download_zipped_csvs_of_transfers(date: time_as_date, output_file_path: path_to_download)` (to get transfer fees :-) )
 
