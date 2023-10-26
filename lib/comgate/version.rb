@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 
 module Comgate
-  VERSION = "0.8.3.7"
+  VERSION = "0.8.3.8"
 end

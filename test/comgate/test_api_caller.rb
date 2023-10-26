@@ -99,7 +99,7 @@ module Comgate
     def test_redirect_if_response_is_302 # rubocop:disable Naming/VariableNumber
       redirect_path = "/redirect/here/please"
 
-      payload = { my_payload: "here" , secret: "BIGSECRET"}
+      payload = { my_payload: "here", secret: "BIGSECRET" }
       url = "#{FAKE_URL}/create"
       expected_redirect_to_url = "#{FAKE_URL}#{redirect_path}"
 
@@ -261,6 +261,58 @@ module Comgate
                               return_value: conn_mock) do
         Comgate::ApiCaller.call(url: url, payload: payload, test_call: true, proxy_uri: proxy_uri)
       end
+    end
+
+    def test_remove_secrets_from_responses
+      api_caller = Comgate::ApiCaller.new(url: FAKE_URL, payload: {}, test_call: true)
+
+      url_encoded_body = "code=0&message=OK&merchant=123456&price=10000&curr=CZK&label=Beatles%20-%20Help&refId=2010102600&method=ALL&email=platce%40email.com&transId=AB12-CD34-EF56&secret=gx4q8OV3TJt6noJnfhjqJKyX3Z6Ych0y&status=PAID"
+      decoded_body = URI.decode_www_form(url_encoded_body).to_h
+      expected_result = {
+        code: "0",
+        message: "OK",
+        merchant: "123456",
+        price: "10000",
+        curr: "CZK",
+        label: "Beatles - Help",
+        refId: "2010102600",
+        method: "ALL",
+        email: "platce@email.com",
+        transId: "AB12-CD34-EF56",
+        secret: "g...y",
+        status: "PAID"
+      }
+
+      result = api_caller.stub(:decoded_response_body, decoded_body) do
+        api_caller.send(:secured_to_log_body)
+      end
+
+      assert_equal(expected_result, result)
+
+      decoded_body = JSON.parse('[{"transferId":1234567,"transferDate":"2023-01-25","accountCounterparty":"0/0000","accountOutgoing":"123456789/0000","variableSymbol":"12345678"}]')
+      expected_result = [
+        {
+          transferId: 1_234_567,
+          transferDate: "2023-01-25",
+          accountCounterparty: "0/0000",
+          accountOutgoing: "123456789/0000",
+          variableSymbol: "12345678"
+        }
+      ]
+
+      result = api_caller.stub(:decoded_response_body, decoded_body) do
+        api_caller.send(:secured_to_log_body)
+      end
+      assert_equal(expected_result, result)
+
+      decoded_body = { error: "1400",
+                       message: "Payment not found (status), params: array (\n  'merchant' => '123456',\n  'secret' => 'x4q8OV3TJt6noJnfhjqJKyX3Z6Ych0y',\n  'transId' => 'AB12-CD34-EF56',\n)\n" }
+      expected_result = { error: "1400",
+                          message: "Payment not found (status), params: array (\n  'merchant' => '123456',\n  'transId' => 'AB12-CD34-EF56',\n)\n" }
+      result = api_caller.stub(:decoded_response_body, decoded_body) do
+        api_caller.send(:secured_to_log_body)
+      end
+      assert_equal(expected_result, result)
     end
 
     private

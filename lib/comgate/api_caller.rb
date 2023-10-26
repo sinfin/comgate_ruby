@@ -173,18 +173,13 @@ module Comgate
       return nil if decoded_response_body.nil?
 
       body_array = if decoded_response_body.respond_to?(:keys)
-        [decoded_response_body.dup]
-      else
-        decoded_response_body.dup
-      end
+                     [decoded_response_body.dup]
+                   else
+                     decoded_response_body.dup
+                   end
 
       s_body_array = body_array.collect do |body|
-        body = body.deep_symbolize_keys
-        body[:secret]  = body[:secret].to_s.gsub(/(.).*(.)/, "$1...$2") if body[:secret].present?
-        if body[:message].present?
-          msg_parts = body[:message].to_s.split(",")
-          body[:message] = msg_parts.select { |p| !p.include?("secret") }.join(",")
-        end
+        secure_body_part(body.deep_symbolize_keys)
       end
 
       if decoded_response_body.respond_to?(:keys)
@@ -192,6 +187,15 @@ module Comgate
       else
         s_body_array
       end
+    end
+
+    def secure_body_part(body)
+      body[:secret] = body[:secret].to_s.gsub(/(.).*(.)/, '\1...\2') unless body[:secret].nil?
+      unless body[:message].nil?
+        msg_parts = body[:message].to_s.split(",")
+        body[:message] = msg_parts.reject { |p| p.include?("secret") }.join(",")
+      end
+      body
     end
 
     def decoded_response_body

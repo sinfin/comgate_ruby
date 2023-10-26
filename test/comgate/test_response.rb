@@ -3,7 +3,7 @@
 require "test_helper"
 
 module Comgate
-  class TestResponsey < Minitest::Test
+  class TestResponse < Minitest::Test
     def test_convert_params_in_hash_response
       api_response_body = {
         "code" => "0",

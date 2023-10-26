@@ -1,3 +1,6 @@
+## [0.8.3.8] - 2023-10-26
+- fixed oversecured logs :-)
+
 ## [0.8.3.7] - 2023-09-14
 - removed `secret` from logs
 
