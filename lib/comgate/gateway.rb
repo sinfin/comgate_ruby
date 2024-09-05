@@ -49,6 +49,8 @@ module Comgate
       payerAcc: %i[payer account_number],
       payer_acc: %i[payer account_number],
       fee: %i[payment fee],
+      cardValid: %i[payment card_valid],
+      cardNumber: %i[payment card_number],
       methods: %i[methods],
       vs: %i[payment variable_symbol],
       variableSymbol: %i[variable_symbol],
